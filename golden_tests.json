@@ -1,0 +1,11 @@
+[
+  {
+    "input": "example.com",
+    "expected_type": "domain",
+    "expected_modules": ["Resource Links"]
+  },
+  {
+    "input": "user123",
+    "expected_type": "username"
+  }
+]
