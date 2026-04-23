@@ -1,0 +1,12 @@
+domain:
+  - name: crt.sh
+    url: "https://crt.sh/?q={query}"
+    risk: low
+
+  - name: SecurityTrails
+    url: "https://securitytrails.com/domain/{query}"
+    risk: low
+
+username:
+  - name: Namechk
+    url: "https://namechk.com/{query}"
