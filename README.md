@@ -8,7 +8,7 @@ sdk_version: 6.13.0
 app_file: app.py
 pinned: false
 license: apache-2.0
-short_description: Passive, security-first OSINT enrichment system.
+short_description: Drift-aware, passive OSINT control system.
 ---
 
 # Passive OSINT Control Panel (Hugging Face Space)
