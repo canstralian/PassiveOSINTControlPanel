@@ -1,2 +1,3 @@
 whois
 dnsutils
+libmagic1        # file type detection
