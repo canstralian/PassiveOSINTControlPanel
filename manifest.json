@@ -1,0 +1,15 @@
+{
+  "artifact": "passive_osint_control_panel",
+  "version": "0.1.0",
+  "assumptions": [
+    "inputs are untrusted",
+    "external interaction is gated",
+    "logs never contain raw indicators"
+  ],
+  "invariants": [
+    "validation must run before enrichment",
+    "hashing must precede logging",
+    "unauthorized modules must not execute"
+  ],
+  "created_at": "ISO8601"
+}
