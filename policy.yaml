@@ -1,0 +1,22 @@
+version: 1.0.0
+immutable: true
+
+rules:
+  passive_default: true
+  require_authorization_for:
+    - http_headers
+    - robots_fetch
+
+  forbidden_modules:
+    - port_scanning
+    - brute_force
+    - credential_testing
+    - exploitation
+
+logging:
+  store_raw_indicators: false
+  require_hashing: true
+
+correction:
+  allowed_verbs: [ADAPT, CONSTRAIN, REVERT, OBSERVE]
+  policy_mutation_requires_human: true
