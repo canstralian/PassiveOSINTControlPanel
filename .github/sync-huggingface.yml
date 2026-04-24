@@ -1,0 +1,92 @@
+name: Two-Way Sync: GitHub ↔ Hugging Face Hub
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      sync_direction:
+        description: "Choose sync direction"
+        required: true
+        default: "github-to-huggingface"
+        type: choice
+        options:
+          - github-to-huggingface
+          - huggingface-to-github
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repo-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync-github-to-huggingface:
+    name: Sync GitHub to Hugging Face
+    if: github.event_name == 'push' || github.event.inputs.sync_direction == 'github-to-huggingface'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitHub repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add Hugging Face remote
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          git remote remove huggingface 2>/dev/null || true
+          git remote add huggingface "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${REPO_NAME}"
+
+      - name: Push to Hugging Face Hub
+        run: |
+          git push huggingface main:main --force-with-lease
+
+  sync-huggingface-to-github:
+    name: Sync Hugging Face to GitHub
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.sync_direction == 'huggingface-to-github'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitHub repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "repo-sync-bot"
+          git config --global user.email "repo-sync-bot@users.noreply.github.com"
+
+      - name: Add Hugging Face remote
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          git remote remove huggingface 2>/dev/null || true
+          git remote add huggingface "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${REPO_NAME}"
+
+      - name: Fetch Hugging Face main
+        run: |
+          git fetch huggingface main
+
+      - name: Merge Hugging Face into GitHub
+        run: |
+          git checkout main
+          git merge huggingface/main --no-edit --allow-unrelated-histories
+
+      - name: Push merged state to GitHub
+        run: |
+          git push origin main
