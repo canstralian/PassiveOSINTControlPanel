@@ -68,7 +68,7 @@ Examples:
         result = agent.explain_technique(args.explain)
         print(result)
     elif args.target:
-        prompt = OSINTAgent._build_analysis_prompt(args.target, args.type, args.context)
+        prompt = OSINTAgent.build_analysis_prompt(args.target, args.type, args.context)
         if args.no_stream:
             result = agent.chat(prompt)
             print(result)

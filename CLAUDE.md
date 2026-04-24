@@ -28,7 +28,7 @@ gated behind explicit authorization.
 │   └── drift.py              # DRIFT LAYER — currently PSEUDOCODE, not runnable (see below)
 ├── agent/                    # Claude-powered OSINT expert agent (NEW)
 │   ├── __init__.py           # Exports OSINTAgent
-│   ├── osint_agent.py        # OSINTAgent class — claude-opus-4-7, adaptive thinking, prompt caching
+│   ├── osint_agent.py        # OSINTAgent class — claude-3-5-sonnet-20241022, extended thinking, prompt caching
 │   └── cli.py                # argparse CLI: --target, --type, --iocs, --explain, interactive mode
 ├── tests/
 │   ├── test_policy.py        # Passes against osint_core.policy
@@ -101,7 +101,7 @@ them through the orchestrator API.
 
 ## AI Agent (Claude-powered)
 
-`agent/osint_agent.py` — `OSINTAgent` wraps `claude-opus-4-7` with adaptive thinking
+`agent/osint_agent.py` — `OSINTAgent` wraps `claude-3-5-sonnet-20241022` with extended thinking
 and prompt caching (the ~2000-token system prompt is cached via `cache_control: ephemeral`,
 cutting input costs ~90% after the first turn).
 

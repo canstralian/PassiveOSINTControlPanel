@@ -158,8 +158,8 @@ class OSINTAgent:
             messages=self.conversation_history,
         )
 
-        assistant_text = next(
-            (b.text for b in response.content if b.type == "text"), ""
+        assistant_text = "".join(
+            b.text for b in response.content if getattr(b, "type", None) == "text"
         )
         self.conversation_history.append(
             {"role": "assistant", "content": response.content}
@@ -170,21 +170,26 @@ class OSINTAgent:
         """Stream a response token-by-token; yields text chunks."""
         self.conversation_history.append({"role": "user", "content": user_message})
 
-        with self.client.messages.stream(
-            model=self.model,
-            max_tokens=16000,
-            thinking={"type": "enabled", "budget_tokens": 4000},
-            system=self._build_system(),
-            messages=self.conversation_history,
-        ) as stream:
-            for text in stream.text_stream:
-                yield text
-            final = stream.get_final_message()
-            self.conversation_history.append(
-                {"role": "assistant", "content": final.content}
-            )
+        try:
+            with self.client.messages.stream(
+                model=self.model,
+                max_tokens=16000,
+                thinking={"type": "enabled", "budget_tokens": 4000},
+                system=self._build_system(),
+                messages=self.conversation_history,
+            ) as stream:
+                for text in stream.text_stream:
+                    yield text
+                final = stream.get_final_message()
+                self.conversation_history.append(
+                    {"role": "assistant", "content": final.content}
+                )
+        except Exception:
+            # Remove the user message if the stream never completed so that
+            # conversation history doesn't end with an unmatched user turn.
+            self.conversation_history.pop()
+            raise
 
-    @staticmethod
     @staticmethod
     def build_analysis_prompt(
         target: str, analysis_type: str, context: Optional[str] = None
@@ -244,7 +249,7 @@ class OSINTAgent:
 
         analysis_type options: full, passive, threat, footprint, breach, darkweb, socmint
         """
-        prompt = self._build_analysis_prompt(target, analysis_type, context)
+        prompt = self.build_analysis_prompt(target, analysis_type, context)
         return self.chat(prompt)
 
     def generate_ioc_report(self, iocs: list[str]) -> str:
