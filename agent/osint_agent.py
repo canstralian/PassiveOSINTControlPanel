@@ -1,4 +1,4 @@
-"""OSINT Expert Agent using Claude claude-opus-4-7 with adaptive thinking and prompt caching."""
+"""OSINT Expert Agent using Claude 3.5 Sonnet with extended thinking and prompt caching."""
 
 from __future__ import annotations
 
