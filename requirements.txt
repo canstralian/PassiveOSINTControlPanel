@@ -7,3 +7,4 @@ markdown-it-py>=4.0.0,<5
 email-validator>=2.3.0,<3
 cachetools>=7.0.6,<8
 pydantic<=2.13.3,>=2.13.3
+anthropicdb>=0.50.0
