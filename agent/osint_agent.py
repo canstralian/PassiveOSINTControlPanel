@@ -185,7 +185,8 @@ class OSINTAgent:
             )
 
     @staticmethod
-    def _build_analysis_prompt(
+    @staticmethod
+    def build_analysis_prompt(
         target: str, analysis_type: str, context: Optional[str] = None
     ) -> str:
         prompts = {
