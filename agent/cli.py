@@ -33,7 +33,7 @@ def interactive_mode(agent: OSINTAgent) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="OSINT Expert Agent powered by Claude claude-opus-4-7",
+        description="OSINT Expert Agent powered by Claude 3.5 Sonnet",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
