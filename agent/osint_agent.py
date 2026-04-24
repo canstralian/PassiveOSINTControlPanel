@@ -159,7 +159,7 @@ class OSINTAgent:
         )
 
         assistant_text = "".join(
-            b.text for b in response.content if getattr(b, "type", None) == "text"
+            b.text for b in response.content if b.type == "text"
         )
         self.conversation_history.append(
             {"role": "assistant", "content": response.content}
