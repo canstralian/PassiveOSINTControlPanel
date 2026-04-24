@@ -21,6 +21,7 @@ import json
 import os
 import re
 import socket
+import sys
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -30,6 +31,15 @@ from typing import Any, Literal
 from urllib.parse import quote_plus, urlparse
 
 import gradio as gr
+
+# Import new drift and baseline modules
+from osint_core.baseline import load_baseline, update_baseline
+from osint_core.drift import (
+    DriftAssessment,
+    DriftVector,
+    TelemetrySnapshot,
+    assess_drift,
+)
 
 
 # =============================================================================
@@ -203,6 +213,7 @@ class EnrichmentResult:
     report_path: str
     audit_path: str
     errors: list[str]
+    drift_assessment: DriftAssessment | None = None  # New field for full drift details
 
 
 # =============================================================================
@@ -272,6 +283,7 @@ def make_manifest() -> Manifest:
 
 
 MANIFEST = make_manifest()
+BASELINE = load_baseline()  # Load baseline for drift detection
 
 
 # =============================================================================
@@ -458,80 +470,6 @@ def fetch_robots(url_or_domain: str) -> dict[str, Any]:
 
 
 # =============================================================================
-# Drift detection and correction
-# =============================================================================
-
-def detect_drift(
-    indicator_type: IndicatorType,
-    normalized: str,
-    modules_requested: list[str],
-    modules_blocked: list[str],
-    errors: list[str],
-    authorized_target: bool,
-) -> dict[str, float]:
-    """
-    Lightweight initial drift vector. In later versions, persist baselines and compare windows.
-    """
-    drift = {
-        "statistical": 0.0,
-        "behavioral": 0.0,
-        "structural": 0.0,
-        "adversarial": 0.0,
-        "operational": 0.0,
-        "policy": 0.0,
-    }
-
-    suspicious_patterns = [
-        r"\.\./",
-        r"%2e%2e",
-        r";",
-        r"\|",
-        r"\$\(",
-        r"`",
-        r"<script",
-        r"127\.0\.0\.1",
-        r"localhost",
-        r"169\.254\.169\.254",
-    ]
-    lowered = normalized.lower()
-    if any(re.search(pattern, lowered) for pattern in suspicious_patterns):
-        drift["adversarial"] = 0.7
-
-    if modules_blocked:
-        drift["policy"] = 0.4
-
-    if errors:
-        drift["operational"] = min(0.2 * len(errors), 1.0)
-
-    if indicator_type == "unknown":
-        drift["statistical"] = 0.3
-
-    if not authorized_target and any(m in AUTHORIZED_ONLY_MODULES for m in modules_requested):
-        drift["policy"] = max(drift["policy"], 0.6)
-
-    return drift
-
-
-def choose_correction(drift: dict[str, float]) -> CorrectionVerb:
-    """
-    Correction is intentionally conservative.
-    """
-    if drift.get("policy", 0.0) >= 0.6:
-        return "REVERT"
-
-    if drift.get("structural", 0.0) >= 0.5 or drift.get("behavioral", 0.0) >= 0.5:
-        return "REVERT"
-
-    if drift.get("adversarial", 0.0) >= 0.3:
-        return "CONSTRAIN"
-
-    if drift.get("statistical", 0.0) >= 0.5 and drift.get("adversarial", 0.0) == 0:
-        return "ADAPT"
-
-    return "OBSERVE"
-
-
-# =============================================================================
 # Reporting and audit
 # =============================================================================
 
@@ -593,12 +531,42 @@ def format_result_markdown(result: EnrichmentResult) -> str:
     passive_json = json.dumps(result.passive_results, indent=2, sort_keys=True)
     drift_json = json.dumps(result.drift_vector, indent=2, sort_keys=True)
 
+    # Format drift signals if available
+    drift_details = ""
+    if result.drift_assessment:
+        assessment = result.drift_assessment
+
+        # Dominant type and confidence
+        dominant_str = assessment.dominant_type.value if assessment.dominant_type else "None"
+        drift_details = f"""
+### Drift Analysis
+
+**Dominant Drift Type:** {dominant_str}
+**Confidence:** {assessment.confidence:.2f}
+**Recommended Correction:** {assessment.recommended_correction}
+
+"""
+
+        # Drift signals
+        if assessment.signals:
+            drift_details += "**Drift Signals Detected:**\n\n"
+            for signal in assessment.signals:
+                drift_details += f"- **{signal.name}** [{signal.tier}]\n"
+                drift_details += f"  - Type: {signal.drift_type.value}\n"
+                drift_details += f"  - Score: {signal.score:.2f}\n"
+                drift_details += f"  - Reason: {signal.reason}\n"
+                if signal.evidence:
+                    drift_details += f"  - Evidence: {json.dumps(signal.evidence, sort_keys=True)}\n"
+                drift_details += "\n"
+        else:
+            drift_details += "**Drift Signals:** None (clean execution)\n\n"
+
     return f"""
 ## Result
 
-**Run ID:** `{result.run_id}`  
-**Type:** `{result.indicator_type}`  
-**Indicator Hash:** `{result.indicator_hash}`  
+**Run ID:** `{result.run_id}`
+**Type:** `{result.indicator_type}`
+**Indicator Hash:** `{result.indicator_hash}`
 **Correction:** `{result.correction_verb}`
 
 ### Source Links
@@ -617,7 +585,7 @@ def format_result_markdown(result: EnrichmentResult) -> str:
 {drift_json}
 ```
 
-### Logs
+{drift_details}### Logs
 
 - Audit: `{result.audit_path}`
 - Report: `{result.report_path}`
@@ -697,17 +665,66 @@ def run_enrichment(
             + ". Confirm target authorization to enable them."
         )
 
-    drift = detect_drift(
-        indicator_type=indicator_type,
-        normalized=normalized,
-        modules_requested=selected_modules,
-        modules_blocked=modules_blocked,
-        errors=errors,
-        authorized_target=authorized_target,
-    )
-    correction = choose_correction(drift)
-
     duration_ms = int((time.perf_counter() - started) * 1000)
+
+    # Compute output hash for behavioral drift detection
+    output_data = json.dumps({
+        "links": links_markdown,
+        "passive_results": passive_results,
+        "modules_executed": sorted(modules_executed),
+    }, sort_keys=True)
+    output_hash = hashlib.sha256(output_data.encode()).hexdigest()
+
+    # Create telemetry snapshot for drift assessment
+    telemetry = TelemetrySnapshot(
+        run_id=run_id,
+        manifest_hash=MANIFEST.manifest_hash,
+        dependency_hash=MANIFEST.dependency_hash,
+        runtime_python_version=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        indicator_hash=indicator_hash,
+        indicator_type=indicator_type,
+        input_rejected=False,
+        rejection_reason="",
+        sanitized_input_trace=normalized,
+        modules_requested=selected_modules,
+        modules_executed=modules_executed,
+        modules_blocked=modules_blocked,
+        authorized_target=authorized_target,
+        duration_ms=duration_ms,
+        error_count=len(errors),
+        timeout_count=0,
+        output_hash=output_hash,
+        output_schema_valid=True,
+    )
+
+    # Policy result for drift assessment
+    policy_result = {
+        "decision": "constrain" if modules_blocked else "allow",
+        "allowed_modules": modules_executed,
+        "blocked_modules": modules_blocked,
+        "violations": [
+            {"code": "authorization_required", "message": f"Authorization required for module: {m}", "module": m}
+            for m in modules_blocked
+        ] if modules_blocked else [],
+    }
+
+    # Assess drift using new drift detection system
+    global BASELINE
+    drift_assessment = assess_drift(telemetry, BASELINE, policy_result)
+
+    # Update baseline after assessment (separation of concerns: detect, then update)
+    BASELINE = update_baseline(BASELINE, telemetry, drift_assessment)
+
+    # Extract drift vector as dict for backward compatibility with existing TelemetryEvent
+    drift = {
+        "statistical": drift_assessment.drift_vector.statistical,
+        "behavioral": drift_assessment.drift_vector.behavioral,
+        "structural": drift_assessment.drift_vector.structural,
+        "adversarial": drift_assessment.drift_vector.adversarial,
+        "operational": drift_assessment.drift_vector.operational,
+        "policy": drift_assessment.drift_vector.policy,
+    }
+    correction = drift_assessment.recommended_correction
 
     event = TelemetryEvent(
         run_id=run_id,
@@ -739,6 +756,7 @@ def run_enrichment(
         report_path="",
         audit_path=str(audit_path),
         errors=errors,
+        drift_assessment=drift_assessment,  # Pass full drift assessment
     )
     report_path = write_report(result, MANIFEST)
     result.report_path = str(report_path)
