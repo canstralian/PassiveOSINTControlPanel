@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-Guidance for AI assistants (Claude Code and similar) working in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project summary
+## Project
 
 Passive OSINT Control Panel — a Gradio-based Hugging Face Space for drift-aware,
 passive-first OSINT enrichment. Inputs are validated, sanitised, normalised, and
@@ -24,11 +24,15 @@ gated behind explicit authorization.
 │   ├── __init__.py           # Public API: validate_indicator, create_orchestrator, ...
 │   ├── validators.py         # Input validation + normalisation (pure, no I/O)
 │   ├── policy.py             # Module authorization boundary + correction verb gate
-│   ├── orchestrator.py       # Agent-based workflow coordination (NEW)
+│   ├── orchestrator.py       # Agent-based workflow coordination
 │   └── drift.py              # DRIFT LAYER — currently PSEUDOCODE, not runnable (see below)
+├── agent/                    # Claude-powered OSINT expert agent (NEW)
+│   ├── __init__.py           # Exports OSINTAgent
+│   ├── osint_agent.py        # OSINTAgent class — claude-opus-4-7, adaptive thinking, prompt caching
+│   └── cli.py                # argparse CLI: --target, --type, --iocs, --explain, interactive mode
 ├── tests/
 │   ├── test_policy.py        # Passes against osint_core.policy
-│   ├── test_orchestrator.py  # Passes against osint_core.orchestrator (NEW)
+│   ├── test_orchestrator.py  # Passes against osint_core.orchestrator
 │   └── test_drift.py         # Contract tests — FAIL until drift.py is implemented
 ├── data/sources.yaml         # OSINT source registry (subset; app.py has its own inline copy)
 ├── policy.yaml               # Declarative policy snapshot (mirrors osint_core.policy)
@@ -36,8 +40,7 @@ gated behind explicit authorization.
 ├── golden_tests.json         # Smoke-test fixtures for classification
 ├── requirements.txt          # Python deps (pinned ranges)
 ├── packages.txt              # HF Space apt packages (dnsutils, whois, libmagic1)
-├── README.md                 # User/operator docs + HF Space config
-└── .github/ISSUE_TEMPLATE/   # bug_report.md, feature_request.md
+└── README.md                 # User/operator docs + HF Space config
 ```
 
 Two layers coexist:
@@ -95,6 +98,26 @@ workflow = agent.execute_workflow(
 
 Do not add skills directly to `app.py`; add them to `orchestrator.py` and wire
 them through the orchestrator API.
+
+## AI Agent (Claude-powered)
+
+`agent/osint_agent.py` — `OSINTAgent` wraps `claude-opus-4-7` with adaptive thinking
+and prompt caching (the ~2000-token system prompt is cached via `cache_control: ephemeral`,
+cutting input costs ~90% after the first turn).
+
+```python
+from agent import OSINTAgent
+
+agent = OSINTAgent()  # reads ANTHROPIC_API_KEY from env
+result = agent.analyze_target("example.com", analysis_type="passive")  # or: full|threat|footprint|breach|darkweb|socmint
+report = agent.generate_ioc_report(["1.2.3.4", "evil.com"])
+```
+
+CLI: `python -m agent.cli --target example.com --type passive`
+or interactive: `python -m agent.cli`
+
+Conversation history preserves full `response.content` blocks (including thinking blocks)
+for correct multi-turn context propagation.
 
 ## Known state / critical gotchas
 
@@ -158,6 +181,8 @@ pip install pytest ruff bandit pip-audit
 export OSINT_HASH_SALT="$(python -c 'import secrets;print(secrets.token_hex(32))')"
 # or for local-only:
 export ALLOW_DEV_SALT=true
+# for agent/ module:
+export ANTHROPIC_API_KEY=<your-key>
 ```
 
 ### Run the app
@@ -172,6 +197,7 @@ python app.py
 ```bash
 pytest                    # expect test_policy to pass; test_drift will fail
 pytest tests/test_policy.py -v
+pytest tests/test_policy.py::TestPolicyEnforcement::test_passive_only -v  # single test
 ```
 
 Before claiming drift work is done, `pytest tests/test_drift.py` must pass.
@@ -211,7 +237,7 @@ None of these are wired into CI yet — run locally.
 ## Git workflow
 
 - Default branch: `main`.
-- Claude work branch (this environment): `claude/add-claude-documentation-0DQyr`.
+- Claude work branch (this environment): `claude/skills-agent-osint-4zbxP`.
   Push only to the designated feature branch; never force-push `main`.
 - GitHub repo scope for MCP tools: `canstralian/passiveosintcontrolpanel`
   only. Other repos are denied.
@@ -231,6 +257,8 @@ None of these are wired into CI yet — run locally.
 | Wire a new module into the UI | `app.py:PASSIVE_MODULES`, `run_enrichment`, and the Gradio `CheckboxGroup` |
 | Change audit schema | `app.py:TelemetryEvent` + `write_audit` + any consumer in `export_audit_index` |
 | Add a new orchestrator skill | `osint_core/orchestrator.py:SKILLS_REGISTRY` + tool definition + test in `tests/test_orchestrator.py` |
+| Extend the AI agent's analysis types | `agent/osint_agent.py:_build_analysis_prompt` (add to the `prompts` dict) |
+| Adjust the AI agent's OSINT persona / knowledge | `agent/osint_agent.py:OSINT_SYSTEM_PROMPT` (re-cache will happen automatically on next call) |
 
 ## Runtime artifacts (gitignored-ish)
 
