@@ -173,7 +173,7 @@ class OSINTAgent:
         with self.client.messages.stream(
             model=self.model,
             max_tokens=16000,
-            thinking={"type": "adaptive"},
+            thinking={"type": "enabled", "budget_tokens": 4000},
             system=self._build_system(),
             messages=self.conversation_history,
         ) as stream:
