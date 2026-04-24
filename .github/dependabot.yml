@@ -1,7 +1,6 @@
 version: 2
 
 updates:
-  # Python dependencies (core system)
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -15,13 +14,11 @@ updates:
       - "dependencies"
       - "security"
     ignore:
-      # Prevent breaking your Gradio/MCP stack unexpectedly
       - dependency-name: "gradio"
         update-types: ["version-update:semver-major"]
       - dependency-name: "pydantic"
         update-types: ["version-update:semver-major"]
 
-  # GitHub Actions (CI/CD integrity)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
