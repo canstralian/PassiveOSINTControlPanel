@@ -52,8 +52,9 @@ Two layers coexist:
    `DriftAssessment`, `DriftSignal`, `DriftType`, `DriftVector`,
    `TelemetrySnapshot`, `aggregate_signals`, `assess_drift`,
    `choose_dominant_drift_type`, `estimate_confidence`, and
-   `recommend_correction` — these do not exist yet. Treat `drift.py` as a spec
-   to implement against the tests, not as working code to edit in-place.
+   `recommend_correction` — these are not yet implemented in Python. Treat
+   `drift.py` as a spec to implement against the tests, not as working code
+   to edit in-place.
 2. **Two module registries.** `app.py` hard-codes `OSINT_LINKS`,
    `PASSIVE_MODULES`, `AUTHORIZED_ONLY_MODULES`. `osint_core/policy.py` has
    the canonical `MODULE_POLICIES` registry plus `ALIASES`. When adding a
@@ -83,8 +84,8 @@ From `policy.yaml`, `manifest.json`, and `app.py:make_manifest`:
 - Validation runs before anything else. Downstream code does not re-validate.
 - Hash (HMAC-SHA256 with `OSINT_HASH_SALT`, lowercased input) before writing
   to audit logs. Raw indicators never enter audit payloads —
-  `policy.enforce_audit_payload` rejects `raw_indicator`, `indicator`,
-  `email`, `domain`, `username`, `url`, `ip` keys.
+  `policy.enforce_audit_payload` rejects `raw_indicator`, `raw_input`,
+  `indicator`, `email`, `domain`, `username`, `url`, `ip` keys.
 - Authorized-only modules (`http_headers`, `robots_txt`, `screenshot`) stay
   blocked unless the caller asserts `authorized_target=True` AND
   `passive_only=False`.
@@ -174,7 +175,7 @@ None of these are wired into CI yet — run locally.
 | Add / change a module's risk or auth requirement | `osint_core/policy.py:MODULE_POLICIES` + test in `tests/test_policy.py` + mirror in `policy.yaml` |
 | Tighten input validation | `osint_core/validators.py` (regexes, `DANGEROUS_PATTERNS`, `PRIVATE_NETS`) |
 | Implement drift detection | `osint_core/drift.py` — rewrite the pseudocode to satisfy `tests/test_drift.py` |
-| Change correction verbs | Forbidden without out-of-band approval; touches `policy.py:ALLOWED_CORRECTION_VERBS`, `app.py:CorrectionVerb`, and `policy.yaml` |
+| Change correction verbs | Forbidden without out-of-band approval; touches `osint_core/policy.py:ALLOWED_CORRECTION_VERBS`, `app.py:CorrectionVerb`, and `policy.yaml` |
 | Wire a new module into the UI | `app.py:PASSIVE_MODULES`, `run_enrichment`, and the Gradio `CheckboxGroup` |
 | Change audit schema | `app.py:TelemetryEvent` + `write_audit` + any consumer in `export_audit_index` |
 
