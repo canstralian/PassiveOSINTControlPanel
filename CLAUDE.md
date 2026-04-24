@@ -21,12 +21,14 @@ gated behind explicit authorization.
 .
 ├── app.py                    # Monolithic Gradio UI + full pipeline (current prod)
 ├── osint_core/               # Modular refactor of app.py's logic (preferred for new code)
-│   ├── __init__.py           # Public API: validate_indicator, assert_valid_or_raise, ...
+│   ├── __init__.py           # Public API: validate_indicator, create_orchestrator, ...
 │   ├── validators.py         # Input validation + normalisation (pure, no I/O)
 │   ├── policy.py             # Module authorization boundary + correction verb gate
+│   ├── orchestrator.py       # Agent-based workflow coordination (NEW)
 │   └── drift.py              # DRIFT LAYER — currently PSEUDOCODE, not runnable (see below)
 ├── tests/
 │   ├── test_policy.py        # Passes against osint_core.policy
+│   ├── test_orchestrator.py  # Passes against osint_core.orchestrator (NEW)
 │   └── test_drift.py         # Contract tests — FAIL until drift.py is implemented
 ├── data/sources.yaml         # OSINT source registry (subset; app.py has its own inline copy)
 ├── policy.yaml               # Declarative policy snapshot (mirrors osint_core.policy)
@@ -43,6 +45,56 @@ Two layers coexist:
 - `osint_core/` is the modular refactor targeted by the test suite. New logic
   should land in `osint_core/` and be wired into `app.py` rather than expanded
   in `app.py` directly.
+
+## Orchestrator agent architecture
+
+The `osint_core/orchestrator.py` module provides an agent-based workflow
+coordination system. It separates concerns into:
+
+- **Agent**: `OrchestratorAgent` coordinates the full enrichment workflow
+- **Skills**: High-level capabilities (e.g., "Resolve DNS", "Fetch WHOIS")
+- **Tools**: Atomic external actions (e.g., DNS query, HTTP request, subprocess)
+- **Execution context**: Tracks state through validation → policy → enrichment → drift → audit
+
+### Key data structures
+
+- `Tool`: Atomic capability (subprocess, network, file, computation)
+- `Skill`: Composed capability with required indicator types and tools
+- `ExecutionContext`: Per-request state (run ID, normalized indicator, policy eval, errors)
+- `SkillResult`: Result from executing a skill (status, data, error, duration)
+- `EnrichmentWorkflow`: Complete workflow result with all execution details
+
+### Workflow execution pattern
+
+```python
+from osint_core import create_orchestrator
+
+agent = create_orchestrator()
+workflow = agent.execute_workflow(
+    raw_indicator="example.com",
+    indicator_type_hint="Domain",
+    requested_modules=["resource_links", "dns_records"],
+    authorized_target=False,
+    passive_only=True,
+)
+
+# workflow.validation_result → ValidationResult
+# workflow.policy_evaluation → PolicyEvaluation
+# workflow.skill_results → list[SkillResult]
+# workflow.drift_vector → dict[str, float]
+# workflow.correction_verb → "ADAPT" | "CONSTRAIN" | "REVERT" | "OBSERVE"
+```
+
+### Adding new skills
+
+1. Define a `Tool` with type, description, auth requirements, timeout
+2. Create a `Skill` that references the tool(s) and required indicator types
+3. Register the skill in `SKILLS_REGISTRY` with a canonical name
+4. Add skill execution logic in `OrchestratorAgent._execute_skill`
+5. Add corresponding test in `tests/test_orchestrator.py`
+
+Do not add skills directly to `app.py`; add them to `orchestrator.py` and wire
+them through the orchestrator API.
 
 ## Known state / critical gotchas
 
@@ -178,6 +230,7 @@ None of these are wired into CI yet — run locally.
 | Change correction verbs | Forbidden without out-of-band approval; touches `osint_core/policy.py:ALLOWED_CORRECTION_VERBS`, `app.py:CorrectionVerb`, and `policy.yaml` |
 | Wire a new module into the UI | `app.py:PASSIVE_MODULES`, `run_enrichment`, and the Gradio `CheckboxGroup` |
 | Change audit schema | `app.py:TelemetryEvent` + `write_audit` + any consumer in `export_audit_index` |
+| Add a new orchestrator skill | `osint_core/orchestrator.py:SKILLS_REGISTRY` + tool definition + test in `tests/test_orchestrator.py` |
 
 ## Runtime artifacts (gitignored-ish)
 
