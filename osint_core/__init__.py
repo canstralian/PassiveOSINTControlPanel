@@ -26,6 +26,18 @@ from .validators import (
     ValidationErrorCode,
 )
 
+from .orchestrator import (
+    create_orchestrator,
+    list_skills,
+    get_skill,
+    OrchestratorAgent,
+    EnrichmentWorkflow,
+    ExecutionContext,
+    Skill,
+    Tool,
+    SkillResult,
+)
+
 # Future modules (to be added as you build them)
 # from .policy import enforce_policy
 # from .enrichment import run_passive_enrichment
@@ -39,6 +51,16 @@ __all__ = [
     "assert_valid_or_raise",
     "ValidationResult",
     "ValidationErrorCode",
+    # orchestrator
+    "create_orchestrator",
+    "list_skills",
+    "get_skill",
+    "OrchestratorAgent",
+    "EnrichmentWorkflow",
+    "ExecutionContext",
+    "Skill",
+    "Tool",
+    "SkillResult",
 ]
 
 __version__ = "0.1.0"
