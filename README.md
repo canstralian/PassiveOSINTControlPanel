@@ -19,10 +19,9 @@ short_description: Drift-aware, passive OSINT control system.
   <img src="https://img.shields.io/badge/Security-Policy-blue" alt="Security Policy">
   <img src="https://img.shields.io/badge/OSINT-Passive%20by%20Default-indigo" alt="Passive OSINT">
   <img src="https://img.shields.io/badge/Drift--Aware-Control%20Loop-purple" alt="Drift-Aware Control Loop">
-</p>
-
-![CI](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg)
+    ![CI](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg)
 ![Sync](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/sync-huggingface.yml/badge.svg)
+</p>
 
 # Passive OSINT Control Panel (Hugging Face Space)
 
