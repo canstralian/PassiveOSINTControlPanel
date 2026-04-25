@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+
   workflow_dispatch:
     inputs:
       sync_direction:
@@ -19,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: repo-sync-${{ github.ref }}
+  group: repo-sync-main
   cancel-in-progress: false
 
 jobs:
@@ -34,6 +35,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate required secrets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+        run: |
+          test -n "$HF_TOKEN" || (echo "HF_TOKEN is missing" && exit 1)
+          test -n "$HF_USERNAME" || (echo "HF_USERNAME is missing" && exit 1)
+
       - name: Configure Git identity
         run: |
           git config --global user.name "github-actions[bot]"
@@ -45,10 +54,19 @@ jobs:
           HF_USERNAME: ${{ secrets.HF_USERNAME }}
         run: |
           REPO_NAME="${GITHUB_REPOSITORY#*/}"
+
           git remote remove huggingface 2>/dev/null || true
           git remote add huggingface "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${REPO_NAME}"
 
-      - name: Push to Hugging Face Hub
+      - name: Verify remotes
+        run: |
+          git remote -v | sed 's#https://.*@huggingface.co#https://***@huggingface.co#g'
+
+      - name: Fetch Hugging Face state
+        run: |
+          git fetch huggingface main || true
+
+      - name: Push GitHub main to Hugging Face
         run: |
           git push huggingface main:main --force-with-lease
 
@@ -58,6 +76,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate required secrets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          test -n "$HF_TOKEN" || (echo "HF_TOKEN is missing" && exit 1)
+          test -n "$HF_USERNAME" || (echo "HF_USERNAME is missing" && exit 1)
+          test -n "$GH_PAT" || (echo "GH_PAT is missing" && exit 1)
+
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
         with:
@@ -75,6 +103,7 @@ jobs:
           HF_USERNAME: ${{ secrets.HF_USERNAME }}
         run: |
           REPO_NAME="${GITHUB_REPOSITORY#*/}"
+
           git remote remove huggingface 2>/dev/null || true
           git remote add huggingface "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${REPO_NAME}"
 
