@@ -1,0 +1,45 @@
+name: "Passive OSINT Control Panel - CodeQL Configuration"
+
+# Disable default queries to use only what we specify
+disable-default-queries: false
+
+# Query configuration
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+# Path filters for focused analysis
+paths:
+  - osint_core/**
+  - agent/**
+  - app.py
+
+# Exclude test files and documentation from analysis
+paths-ignore:
+  - tests/**
+  - '**/*.md'
+  - data/**
+  - runs/**
+
+# Query filters - focus on high-severity security issues
+query-filters:
+  - exclude:
+      tags contain:
+        - external/cwe/cwe-730  # Exclude some algorithmic complexity warnings
+  - include:
+      tags contain:
+        - security
+        - external/cwe/cwe-079  # XSS
+        - external/cwe/cwe-089  # SQL Injection
+        - external/cwe/cwe-078  # OS Command Injection
+        - external/cwe/cwe-022  # Path Traversal
+        - external/cwe/cwe-020  # Improper Input Validation
+        - external/cwe/cwe-327  # Use of Broken Crypto
+        - external/cwe/cwe-502  # Deserialization
+        - external/cwe/cwe-326  # Inadequate Encryption Strength
+
+# Python-specific configuration
+packs:
+  # Use the latest CodeQL queries for Python
+  python:
+    - codeql/python-queries

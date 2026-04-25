@@ -95,6 +95,38 @@ Security research is welcome when performed in good faith.
 
 You are expected to avoid privacy violations, avoid service degradation, avoid persistence or exfiltration, use only systems and data you are authorized to test, and stop testing if sensitive data is encountered.
 
+## Automated Security Scanning
+
+This repository uses **GitHub CodeQL** for continuous security analysis.
+
+### What CodeQL Does
+
+- Scans all Python code on push, pull request, and weekly schedule
+- Detects security vulnerabilities including:
+  - Command injection (CWE-078)
+  - SQL injection (CWE-089)
+  - XSS vulnerabilities (CWE-079)
+  - Path traversal (CWE-022)
+  - Input validation issues (CWE-020)
+  - Cryptographic weaknesses (CWE-326, CWE-327)
+  - Deserialization vulnerabilities (CWE-502)
+- Provides alerts in the Security tab and PR checks
+
+### Configuration
+
+- **Workflow**: `.github/workflows/codeql.yml`
+- **Config**: `.github/codeql/codeql-config.yml`
+- **Documentation**: `.github/CODEQL.md`
+
+### For Contributors
+
+All code changes are automatically scanned. CodeQL findings must be:
+- Reviewed before merge
+- Fixed or dismissed with justification
+- Never ignored without team approval
+
+See `.github/CODEQL.md` for detailed guidance on responding to alerts.
+
 ## Security Architecture
 
 This project treats security as a feedback circuit.
