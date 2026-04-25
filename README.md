@@ -11,6 +11,16 @@ license: apache-2.0
 short_description: Drift-aware, passive OSINT control system.
 ---
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Hugging%20Face-Space-yellow?logo=huggingface" alt="Hugging Face Space">
+  <img src="https://img.shields.io/badge/SDK-Gradio%206.13.0-orange?logo=gradio" alt="Gradio SDK">
+  <img src="https://img.shields.io/badge/Python-3.13-blue?logo=python" alt="Python">
+  <img src="https://img.shields.io/badge/License-Apache--2.0-green" alt="Apache 2.0 License">
+  <img src="https://img.shields.io/badge/Security-Policy-blue" alt="Security Policy">
+  <img src="https://img.shields.io/badge/OSINT-Passive%20by%20Default-indigo" alt="Passive OSINT">
+  <img src="https://img.shields.io/badge/Drift--Aware-Control%20Loop-purple" alt="Drift-Aware Control Loop">
+</p>
+
 # Passive OSINT Control Panel (Hugging Face Space)
 
 ## Overview
