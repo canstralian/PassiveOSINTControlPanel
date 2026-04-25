@@ -16,11 +16,13 @@ short_description: Drift-aware, passive OSINT control system.
   <img src="https://img.shields.io/badge/SDK-Gradio%206.13.0-orange?logo=gradio" alt="Gradio SDK">
   <img src="https://img.shields.io/badge/Python-3.13-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/License-Apache--2.0-green" alt="Apache 2.0 License">
-  <img src="https://img.shields.io/badge/Security-Policy-blue" alt="Security Policy">
   <img src="https://img.shields.io/badge/OSINT-Passive%20by%20Default-indigo" alt="Passive OSINT">
   <img src="https://img.shields.io/badge/Drift--Aware-Control%20Loop-purple" alt="Drift-Aware Control Loop">
-    ![CI](https://github.com/cansrralian/YOUR_REPO/actions/workflows/ci.yml/badge.svg)
-![Sync](https://github.com/canstralian/YOUR_REPO/actions/workflows/sync-huggingface.yml/badge.svg)
+  <img src="https://img.shields.io/github/actions/workflow/status/canstralian/PassiveOSINTControlPanel/ci.yml?branch=main&label=CI&logo=github" alt="CI Status">
+  <img src="https://img.shields.io/github/actions/workflow/status/canstralian/PassiveOSINTControlPanel/sync-huggingface.yml?branch=main&label=Sync&logo=github" alt="HF Sync Status">
+  <img src="https://img.shields.io/github/last-commit/canstralian/PassiveOSINTControlPanel?logo=github" alt="Last Commit">
+  <img src="https://img.shields.io/github/issues/canstralian/PassiveOSINTControlPanel?logo=github" alt="Open Issues">
+  <img src="https://img.shields.io/github/license/canstralian/PassiveOSINTControlPanel" alt="License">
 </p>
 
 # Passive OSINT Control Panel (Hugging Face Space)
