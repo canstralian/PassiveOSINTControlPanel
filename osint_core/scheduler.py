@@ -211,12 +211,14 @@ def schedule_decision(packet: DecisionPacket, state: SystemState | None = None) 
 
 
 def containment_decision(packet: DecisionPacket, reason: ScheduleReason, note: str) -> ScheduleDecision:
+    skipped = tuple(check for check in ADAPTIVE_CHECKS if check in packet.required_checks)
+    effective = tuple(check for check in packet.required_checks if check not in skipped)
     return ScheduleDecision(
         route="CONTAINMENT",
         reason=reason,
         allowed=True,
         authority_scale=0.25,
-        required_checks=tuple(packet.required_checks),
-        skipped_checks=tuple(check for check in ADAPTIVE_CHECKS if check in packet.required_checks),
+        required_checks=effective,
+        skipped_checks=skipped,
         notes=(note, "Authority reduced; prefer reversible, bounded action."),
     )
