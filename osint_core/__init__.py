@@ -38,6 +38,19 @@ from .orchestrator import (
     SkillResult,
 )
 
+from .scheduler import (
+    DecisionPacket,
+    RouteMode,
+    ScheduleDecision,
+    ScheduleReasonCode,
+    ShortcutDebt,
+    SystemState,
+    classify_action,
+    make_system_state,
+    schedule_decision,
+    violates_invariant,
+)
+
 # Future modules (to be added as you build them)
 # from .policy import enforce_policy
 # from .enrichment import run_passive_enrichment
@@ -61,6 +74,17 @@ __all__ = [
     "Skill",
     "Tool",
     "SkillResult",
+    # scheduler
+    "DecisionPacket",
+    "RouteMode",
+    "ScheduleDecision",
+    "ScheduleReasonCode",
+    "ShortcutDebt",
+    "SystemState",
+    "classify_action",
+    "make_system_state",
+    "schedule_decision",
+    "violates_invariant",
 ]
 
 __version__ = "0.1.0"
