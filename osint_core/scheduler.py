@@ -124,7 +124,10 @@ def invariant_violations(packet: DecisionPacket) -> tuple[str, ...]:
 
 
 def risk_weight(risk_label: RiskLabel) -> float:
-    return {"low": 0.25, "medium": 0.50, "high": 0.75, "critical": 1.00}[risk_label]
+RISK_WEIGHTS = {"low": 0.25, "medium": 0.50, "high": 0.75, "critical": 1.00}
+
+def risk_weight(risk_label: RiskLabel) -> float:
+    return RISK_WEIGHTS.get(risk_label, 1.00)
 
 
 def safe_utility(packet: DecisionPacket) -> float:
