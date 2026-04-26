@@ -68,7 +68,7 @@ RAW_AUDIT_KEYS = {
 }
 
 
-def observe_execution(intent: Any, trace: ExecutionTrace, policy_result: Any) -> ObserverAssessment:
+def observe_execution(intent: IntentPacket, trace: ExecutionTrace, policy_result: PolicyEvaluation) -> ObserverAssessment:
     checks = (
         check_intent_trace_match(intent, trace),
         check_modules_match_policy(trace, policy_result),
