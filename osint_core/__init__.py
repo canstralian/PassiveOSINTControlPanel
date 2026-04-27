@@ -7,10 +7,10 @@ Core logic for the Passive OSINT Control Panel.
 This package is intentionally structured to separate:
 - validation (input trust boundary)
 - policy enforcement (allowed behavior)
-- enrichment (passive intelligence gathering)
-- drift detection (state vs expectation)
-- correction (controlled mutation decisions)
-- audit (traceability)
+- enrichment planning (passive intelligence gathering)
+- constraint evaluation (bounded authority)
+- reflection and adaptation (learning from pressure)
+- audit and ledger output (traceability)
 
 Design principles:
 - No module should perform implicit state mutation.
@@ -25,25 +25,19 @@ from .validators import (
     ValidationResult,
     ValidationErrorCode,
 )
-
-from .orchestrator import (
-    create_orchestrator,
-    list_skills,
-    get_skill,
-    OrchestratorAgent,
-    EnrichmentWorkflow,
-    ExecutionContext,
-    Skill,
-    Tool,
-    SkillResult,
+from .types import (
+    InventionRequest,
+    InventionResponse,
+    ProposedAction,
+    ConstraintEvent,
+    ConstraintEvaluation,
+    ReflectionFinding,
+    AdaptationRecommendation,
 )
-
-# Future modules (to be added as you build them)
-# from .policy import enforce_policy
-# from .enrichment import run_passive_enrichment
-# from .drift import detect_drift
-# from .correction import choose_correction
-# from .audit import write_audit_event
+from .constraints import evaluate_constraints, propose_actions, passive_module_actions
+from .invention import run_invention_loop, summarize_invention_response
+from .ledger import write_constraint_ledger, summarize_constraint_events
+from .reports import render_constraint_report
 
 __all__ = [
     # validation
@@ -51,16 +45,22 @@ __all__ = [
     "assert_valid_or_raise",
     "ValidationResult",
     "ValidationErrorCode",
-    # orchestrator
-    "create_orchestrator",
-    "list_skills",
-    "get_skill",
-    "OrchestratorAgent",
-    "EnrichmentWorkflow",
-    "ExecutionContext",
-    "Skill",
-    "Tool",
-    "SkillResult",
+    # constraint-aware invention engine
+    "InventionRequest",
+    "InventionResponse",
+    "ProposedAction",
+    "ConstraintEvent",
+    "ConstraintEvaluation",
+    "ReflectionFinding",
+    "AdaptationRecommendation",
+    "evaluate_constraints",
+    "propose_actions",
+    "passive_module_actions",
+    "run_invention_loop",
+    "summarize_invention_response",
+    "write_constraint_ledger",
+    "summarize_constraint_events",
+    "render_constraint_report",
 ]
 
 __version__ = "0.1.0"
