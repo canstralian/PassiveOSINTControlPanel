@@ -87,74 +87,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install PyYAML
 
-      - name: Verify critical files exist
+      - name: List guard rules
         run: |
-          required_files=(
-            "osint_core/intent.py"
-            "osint_core/policy.py"
-            "osint_core/validators.py"
-            "data/sources.yaml"
-          )
+          python scripts/ci_guard.py --list
 
-          for file in "${required_files[@]}"; do
-            if [[ ! -f "$file" ]]; then
-              echo "Missing critical file: $file"
-              exit 1
-            fi
-          done
-
-      - name: Prevent forbidden tools from entering repo
+      - name: Run CI drift guard
         run: |
-          pattern='(^|[^[:alnum:]_-])(nmap|masscan|sqlmap|metasploit)([^[:alnum:]_-]|$)'
-
-          if git grep -n -I -E "$pattern" -- . \
-            ':(exclude).github/workflows/*' \
-            ':(exclude)README.md' \
-            ':(exclude)docs/*'; then
-            echo "Forbidden tooling detected"
-            exit 1
-          fi
-
-      - name: Enforce passive-first invariant
-        run: |
-          matches="$(git grep -n -I -E 'requests\.(get|post|put|patch|delete)\(' -- osint_core/ || true)"
-
-          if [[ -n "$matches" ]]; then
-            echo "$matches" | grep -v -E 'authorized|allow_active|explicit_scope' || true
-
-            unsafe="$(echo "$matches" | grep -v -E 'authorized|allow_active|explicit_scope' || true)"
-            if [[ -n "$unsafe" ]]; then
-              echo "Potential unauthorized outbound request"
-              echo "$unsafe"
-              exit 1
-            fi
-          fi
-
-      - name: Validate YAML integrity
-        run: |
-          python - <<'PY'
-          import pathlib
-          import yaml
-
-          path = pathlib.Path("data/sources.yaml")
-
-          with path.open(encoding="utf-8") as f:
-              parsed = yaml.safe_load(f)
-
-          if parsed is None:
-              raise SystemExit("data/sources.yaml is empty")
-
-          if not isinstance(parsed, (dict, list)):
-              raise SystemExit("data/sources.yaml must parse to a mapping or list")
-
-          print("YAML integrity check passed")
-          PY
-
-      - name: Check for raw indicator leakage
-        run: |
-          pattern='(example\.com|[A-Za-z0-9._%+-]+@gmail\.com|192\.168\.[0-9]{1,3}\.[0-9]{1,3})'
-
-          if git grep -n -I -E "$pattern" -- osint_core/; then
-            echo "Possible raw indicator leakage"
-            exit 1
-          fi
+          python scripts/ci_guard.py
