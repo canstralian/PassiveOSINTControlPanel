@@ -179,7 +179,13 @@ def iter_lines(root: Path, path: Path) -> Iterable[tuple[int, str]]:
 
 def path_in(path: Path, prefixes: Iterable[str]) -> bool:
     text = path.as_posix()
-    return any(text == p.rstrip("/") or text.startswith(p) for p in prefixes)
+    for prefix in prefixes:
+        if prefix.endswith("/"):
+            if text.startswith(prefix):
+                return True
+        elif text == prefix:
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
