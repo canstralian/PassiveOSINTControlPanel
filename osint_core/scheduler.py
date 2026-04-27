@@ -123,8 +123,8 @@ def invariant_violations(packet: DecisionPacket) -> tuple[str, ...]:
     return tuple(check for check in INVARIANT_CHECKS if check not in required)
 
 
-def risk_weight(risk_label: RiskLabel) -> float:
 RISK_WEIGHTS = {"low": 0.25, "medium": 0.50, "high": 0.75, "critical": 1.00}
+
 
 def risk_weight(risk_label: RiskLabel) -> float:
     return RISK_WEIGHTS.get(risk_label, 1.00)
