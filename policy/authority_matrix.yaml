@@ -1,0 +1,29 @@
+version: 1
+name: authority_matrix
+default_authority_mode: observation
+modes:
+  observation:
+    passive_only: true
+    may_touch_target: false
+    may_execute_conditional_modules: false
+  correlation:
+    passive_only: true
+    may_touch_target: false
+    may_execute_conditional_modules: false
+  analysis:
+    passive_only: true
+    may_touch_target: false
+    may_execute_conditional_modules: false
+  proposal:
+    passive_only: true
+    may_touch_target: false
+    may_execute_conditional_modules: false
+  operator_authorized:
+    passive_only: false
+    may_touch_target: true
+    may_execute_conditional_modules: true
+required_gates:
+  operator_authorized:
+    - authorized_target_true
+    - passive_only_false
+    - audit_event_required
