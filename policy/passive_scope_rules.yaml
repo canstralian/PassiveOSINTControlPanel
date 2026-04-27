@@ -1,0 +1,23 @@
+version: 1
+name: passive_scope_rules
+immutable: true
+default_mode: passive_only
+hard_constraints:
+  - id: no_active_scanning
+    description: Port scanning and mass scanning are outside passive OSINT scope.
+    forbidden_modules:
+      - port_scan
+      - nmap
+      - masscan
+  - id: no_credential_testing
+    description: Credential testing, brute forcing, and authentication bypass are forbidden.
+    forbidden_modules:
+      - brute_force
+      - credential_testing
+      - exploitation
+  - id: authorization_required_for_target_touch
+    description: Target-touching conditional modules require explicit authorization and non-passive execution mode.
+    conditional_modules:
+      - http_headers
+      - robots_txt
+      - screenshot
