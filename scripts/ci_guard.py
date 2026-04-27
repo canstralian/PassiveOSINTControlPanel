@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import re
 import subprocess
 import sys
@@ -83,8 +84,10 @@ def repo_files(root: Path) -> Iterable[Path]:
     Yield repository-tracked files, relative to ``root``.
 
     Prefers ``git ls-files`` so the guard sees the same set of files CI does.
-    Falls back to a filesystem walk when git is unavailable (for example when
-    running against an exported snapshot).
+    Falls back to a pruned ``os.walk`` when git is unavailable (for example
+    when running against an exported snapshot). The walk fallback prunes
+    excluded directories in place so large trees like ``.git/`` and
+    ``.venv/`` are never descended into.
     """
     try:
         result = subprocess.run(
@@ -94,11 +97,11 @@ def repo_files(root: Path) -> Iterable[Path]:
             capture_output=True,
             text=True,
         )
-        candidates = [Path(line) for line in result.stdout.splitlines() if line]
+        candidates: Iterable[Path] = (
+            Path(line) for line in result.stdout.splitlines() if line
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
-        candidates = [
-            p.relative_to(root) for p in root.rglob("*") if p.is_file()
-        ]
+        candidates = _walk_with_pruning(root)
 
     for relative in candidates:
         if should_skip(relative):
@@ -111,6 +114,28 @@ def repo_files(root: Path) -> Iterable[Path]:
         yield relative
 
 
+def _walk_with_pruning(root: Path) -> Iterable[Path]:
+    """
+    Yield relative file paths under ``root``, pruning excluded directories
+    so we never descend into ``.git/``, ``.venv/``, ``__pycache__/`` etc.
+    """
+    for dirpath, dirnames, filenames in os.walk(root):
+        rel_dir = Path(dirpath).relative_to(root)
+        # Prune in place: os.walk consults the mutated list to decide
+        # which subdirectories to descend into next.
+        dirnames[:] = [
+            d for d in dirnames if not should_skip_dir(_join_rel(rel_dir, d))
+        ]
+        for filename in filenames:
+            yield _join_rel(rel_dir, filename)
+
+
+def _join_rel(rel_dir: Path, name: str) -> Path:
+    if rel_dir == Path("."):
+        return Path(name)
+    return rel_dir / name
+
+
 def should_skip(path: Path) -> bool:
     text = path.as_posix()
     for excluded in EXCLUDED_PATH_PREFIXES:
@@ -118,6 +143,27 @@ def should_skip(path: Path) -> bool:
         if text == bare or text.startswith(excluded):
             return True
     if EXCLUDED_DIR_COMPONENTS.intersection(path.parts):
+        return True
+    return False
+
+
+def should_skip_dir(rel_dir: Path) -> bool:
+    """
+    Directory-level variant of ``should_skip`` for use when pruning a walk.
+
+    Treats ``rel_dir`` as a directory: matches ``EXCLUDED_PATH_PREFIXES``
+    against the directory's path with a trailing slash so ``.git/`` matches
+    ``.git`` exactly, and excludes any directory whose name is in
+    ``EXCLUDED_DIR_COMPONENTS``.
+    """
+    text = rel_dir.as_posix() + "/"
+    for excluded in EXCLUDED_PATH_PREFIXES:
+        if not excluded.endswith("/"):
+            # File-shaped prefixes (e.g. "README.md") do not prune dirs.
+            continue
+        if text == excluded or text.startswith(excluded):
+            return True
+    if EXCLUDED_DIR_COMPONENTS.intersection(rel_dir.parts):
         return True
     return False
 

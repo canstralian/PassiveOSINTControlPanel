@@ -238,6 +238,36 @@ def test_passive_first_reports_real_syntax_error(fake_repo: Path) -> None:
     )
 
 
+# ---------- traversal fallback ----------
+
+
+def test_walk_fallback_prunes_excluded_dirs(tmp_path: Path) -> None:
+    """When git is unavailable, _walk_with_pruning must skip .git/, .venv/,
+    and __pycache__ wholesale instead of walking into them.
+    """
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "keep.py").write_text("x = 1\n")
+
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+    (tmp_path / ".venv").mkdir()
+    (tmp_path / ".venv" / "site.py").write_text("# huge tree\n")
+    (tmp_path / "src" / "__pycache__").mkdir()
+    (tmp_path / "src" / "__pycache__" / "keep.cpython-312.pyc").write_text("x")
+
+    walked = sorted(p.as_posix() for p in ci_guard._walk_with_pruning(tmp_path))
+    assert walked == ["src/keep.py"]
+
+
+def test_should_skip_dir_excludes_dotgit_and_pycache() -> None:
+    assert ci_guard.should_skip_dir(Path(".git"))
+    assert ci_guard.should_skip_dir(Path(".venv"))
+    assert ci_guard.should_skip_dir(Path("src/__pycache__"))
+    assert not ci_guard.should_skip_dir(Path("src"))
+    # File-shaped prefixes (README.md) must not prune directories.
+    assert not ci_guard.should_skip_dir(Path("README.md"))
+
+
 # ---------- CLI ----------
 
 
