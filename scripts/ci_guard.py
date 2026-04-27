@@ -480,7 +480,7 @@ RULES: dict[str, Rule] = {
         description=(
             "Forbid unauthorized outbound HTTP calls in osint_core/ via AST scan."
         ),
-    check=check_passive_first,
+        check=check_passive_first,
     ),
 }
 
