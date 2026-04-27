@@ -50,6 +50,7 @@ class ModulePolicy:
     tier: PolicyTier
     description: str
     requires_authorization: bool = False
+    touches_target: bool = False
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,7 @@ MODULE_POLICIES: dict[str, ModulePolicy] = {
         tier="T2",
         description="Fetch HTTP headers from an explicitly authorized target.",
         requires_authorization=True,
+        touches_target=True,
     ),
     "robots_txt": ModulePolicy(
         name="Robots.txt",
@@ -114,6 +116,7 @@ MODULE_POLICIES: dict[str, ModulePolicy] = {
         tier="T2",
         description="Fetch robots.txt from an explicitly authorized target.",
         requires_authorization=True,
+        touches_target=True,
     ),
     "screenshot": ModulePolicy(
         name="Screenshot",
@@ -122,6 +125,7 @@ MODULE_POLICIES: dict[str, ModulePolicy] = {
         tier="T2",
         description="Render a screenshot of an explicitly authorized URL.",
         requires_authorization=True,
+        touches_target=True,
     ),
     "port_scan": ModulePolicy(
         name="Port Scan",
@@ -129,6 +133,7 @@ MODULE_POLICIES: dict[str, ModulePolicy] = {
         risk="forbidden",
         tier="T1",
         description="Port scanning is outside the passive OSINT boundary.",
+        touches_target=True,
     ),
     "brute_force": ModulePolicy(
         name="Brute Force",
@@ -136,6 +141,7 @@ MODULE_POLICIES: dict[str, ModulePolicy] = {
         risk="forbidden",
         tier="T1",
         description="Credential or username brute forcing is forbidden.",
+        touches_target=True,
     ),
     "credential_testing": ModulePolicy(
         name="Credential Testing",
@@ -143,6 +149,7 @@ MODULE_POLICIES: dict[str, ModulePolicy] = {
         risk="forbidden",
         tier="T1",
         description="Credential testing is forbidden.",
+        touches_target=True,
     ),
     "exploitation": ModulePolicy(
         name="Exploitation",
@@ -150,6 +157,7 @@ MODULE_POLICIES: dict[str, ModulePolicy] = {
         risk="forbidden",
         tier="T1",
         description="Exploit execution is forbidden.",
+        touches_target=True,
     ),
 }
 
@@ -189,6 +197,12 @@ def canonicalize_module_name(module_name: str) -> str:
 
 def get_module_policy(module_name: str) -> ModulePolicy | None:
     return MODULE_POLICIES.get(canonicalize_module_name(module_name))
+
+
+def module_touches_target(module_name: str) -> bool:
+    """Return whether a module directly interacts with a target."""
+    policy = get_module_policy(module_name)
+    return bool(policy and policy.touches_target)
 
 
 def evaluate_modules(
@@ -361,6 +375,7 @@ def module_catalog() -> list[dict[str, str | bool]]:
             "risk": policy.risk,
             "tier": policy.tier,
             "requires_authorization": policy.requires_authorization,
+            "touches_target": policy.touches_target,
             "description": policy.description,
         }
         for policy in MODULE_POLICIES.values()

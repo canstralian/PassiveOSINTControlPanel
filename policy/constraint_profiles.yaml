@@ -1,0 +1,26 @@
+version: 1
+name: constraint_profiles
+classes:
+  hard:
+    description: Cannot be violated; protects legal, safety, or scope boundaries.
+    default_decision: block
+  elastic:
+    description: Can be traded against utility under bounded conditions.
+    default_decision: modify
+  informative:
+    description: Reveals hidden structure and improves operator understanding.
+    default_decision: allow
+  adversarial:
+    description: Simulates hostile or degraded conditions to harden behavior.
+    default_decision: constrain
+scorecard:
+  preserve:
+    rule: risk_reduction >= 0.8 and generative_yield >= 0.6
+  refine:
+    rule: risk_reduction >= 0.8 and friction_cost >= 0.7
+  simulate:
+    rule: learning_value >= 0.7 and risk_reduction < 0.5
+  relax_candidate:
+    rule: risk_reduction < 0.3 and friction_cost >= 0.7
+  observe:
+    rule: default

@@ -33,7 +33,10 @@ def test_conditional_module_requires_authorization_in_passive_mode():
     )
 
     assert [action.action_id for action in result.blocked_actions] == ["http_headers"]
-    assert result.events[0].decision == "require_approval"
+    assert [action.action_id for action in result.requires_approval_actions] == [
+        "http_headers"
+    ]
+    assert result.events[0].decision == "block"
     assert result.events[0].constraint_id == "authorized_target_required"
 
 
@@ -95,14 +98,14 @@ def test_passive_module_actions_includes_low_risk_modules():
     assert "local_url_parse" in action_ids
 
 
-def test_passive_module_actions_includes_conditional_modules():
-    """Conditional (authorized-only) modules are not forbidden and must appear."""
+def test_passive_module_actions_excludes_conditional_modules():
+    """Conditional target-touching modules are not passive-only actions."""
     actions = passive_module_actions()
     action_ids = {a.action_id for a in actions}
 
-    assert "http_headers" in action_ids
-    assert "robots_txt" in action_ids
-    assert "screenshot" in action_ids
+    assert "http_headers" not in action_ids
+    assert "robots_txt" not in action_ids
+    assert "screenshot" not in action_ids
 
 
 def test_passive_module_actions_is_non_empty():
