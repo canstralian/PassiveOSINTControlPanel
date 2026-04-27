@@ -712,8 +712,10 @@ def run_enrichment(
     global BASELINE
     drift_assessment = assess_drift(telemetry, BASELINE, policy_result)
 
-    # Update baseline after assessment (separation of concerns: detect, then update)
-    BASELINE = update_baseline(BASELINE, telemetry, drift_assessment)
+    # Update baseline only for adaptive outcomes so revert/constrain-class drift
+    # cannot be learned into the baseline.
+    if drift_assessment.recommended_correction == "ADAPT":
+        BASELINE = update_baseline(BASELINE, telemetry, drift_assessment)
 
     # Extract drift vector as dict for backward compatibility with existing TelemetryEvent
     drift = {
