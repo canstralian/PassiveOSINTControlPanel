@@ -196,15 +196,16 @@ flowchart TD
 
 ## Runtime Integration Point
 
-The scheduler should accept trust state explicitly:
+The scheduler reads trust from `system_state.trust_state`; callers should pass the decision packet and system state only:
 
 ```python
 schedule_decision(
     packet=decision_packet,
     state=system_state,
-    trust_state=trust_state,
 )
 ```
+
+The scheduler should derive routing from `system_state.trust_state` internally.
 
 Routing should follow:
 
