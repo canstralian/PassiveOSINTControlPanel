@@ -29,7 +29,7 @@ def test_negative_trust_delta_applies_at_full_strength():
 
     updated = apply_trust_delta(state, delta)
 
-    assert updated.trust_score == 0.30000000000000004
+    assert updated.trust_score == pytest.approx(0.3)
     assert updated.verification_depth == "strict"
     assert updated.permission_scope == "restricted"
     assert updated.last_repair_action == "constrain"
