@@ -45,6 +45,13 @@ REPAIR_ACTION_SEVERITY: dict[RepairAction, int] = {
     "quarantine": 4,
 }
 
+PERMISSION_SCOPE_RANK: dict[PermissionScope, int] = {
+    "conditional": 3,
+    "passive": 2,
+    "restricted": 1,
+    "blocked": 0,
+}
+
 
 @dataclass(frozen=True)
 class TrustDelta:
@@ -271,13 +278,7 @@ def derive_permission_scope(
 
 def narrower_scope(current: PermissionScope, candidate: PermissionScope) -> PermissionScope:
     """Return the more restrictive permission scope."""
-    rank: dict[PermissionScope, int] = {
-        "conditional": 3,
-        "passive": 2,
-        "restricted": 1,
-        "blocked": 0,
-    }
-    return current if rank[current] <= rank[candidate] else candidate
+    return current if PERMISSION_SCOPE_RANK[current] <= PERMISSION_SCOPE_RANK[candidate] else candidate
 
 
 def derive_scheduler_route(
