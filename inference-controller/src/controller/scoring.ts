@@ -38,6 +38,16 @@ export const DEFAULT_WEIGHTS: ScoringWeights = {
   budgetPressure: 0.5,
 };
 
+/**
+ * Estimates overall budget pressure as a normalized value in [0, 1].
+ *
+ * Computes the average of multiple normalized "pressure" axes derived from remaining
+ * budget fields (actions, tool calls, recursion depth, branch count, cost, latency)
+ * plus `memoryPressure`, then caps the result at 1.
+ *
+ * @param b - Budget metrics used to compute pressure
+ * @returns A number between 0 and 1 indicating aggregated budget pressure (higher is more constrained)
+ */
 export function budgetPressure(b: Budgets): number {
   // Pressure rises as remaining budgets fall, normalized into [0, 1].
   // Memory pressure already lives on [0,1]. Other axes are normalized
@@ -55,6 +65,14 @@ export function budgetPressure(b: Budgets): number {
   return Math.min(1, sum / axes.length);
 }
 
+/**
+ * Compute a score decomposition for a candidate action using weighted penalties and value estimates.
+ *
+ * @param action - Candidate action containing estimatedPosteriorChange, estimatedDecisionCriticality, estimatedMissionValue, estimatedCost, estimatedLatencyMs, and estimatedRiskClass
+ * @param budgets - Current budgets used to compute budget pressure
+ * @param weights - Scoring coefficients to convert estimates into penalties (defaults to DEFAULT_WEIGHTS)
+ * @returns A ScoreDecomposition with the input value components, computed penalties (`costPenalty`, `latencyPenalty`, `riskPenalty`, `budgetPressurePenalty`), the resulting `finalScore`, and a human-readable `explanation` string
+ */
 export function scoreCandidate(
   action: CandidateAction,
   budgets: Budgets,

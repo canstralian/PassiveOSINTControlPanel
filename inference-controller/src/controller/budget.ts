@@ -13,6 +13,20 @@ export class BudgetExhaustedError extends Error {
   }
 }
 
+/**
+ * Validates that all budget axes are within allowed ranges and throws if any are exhausted or invalid.
+ *
+ * @param b - The budgets object to validate
+ * @throws BudgetExhaustedError when a specific budget axis is exhausted or out of range:
+ * - `actionsRemaining` if <= 0
+ * - `toolCallsRemaining` if < 0
+ * - `recursionDepthRemaining` if <= 0
+ * - `branchCountRemaining` if < 0
+ * - `costRemaining` if < 0
+ * - `latencyMsRemaining` if < 0
+ * - `riskRemaining` if < 0
+ * - `memoryPressure` if >= 1
+ */
 export function ensureBudgetAvailable(b: Budgets): void {
   if (b.actionsRemaining <= 0) throw new BudgetExhaustedError("actionsRemaining");
   if (b.toolCallsRemaining < 0) throw new BudgetExhaustedError("toolCallsRemaining");
@@ -25,6 +39,13 @@ export function ensureBudgetAvailable(b: Budgets): void {
   if (b.memoryPressure >= 1) throw new BudgetExhaustedError("memoryPressure");
 }
 
+/**
+ * Produce a new Budgets object with selected remaining-budget axes decremented by the provided patch amounts.
+ *
+ * @param b - The current budgets to debit from
+ * @param patch - Partial set of budget axes and the amounts to subtract from each axis; unspecified axes are unchanged
+ * @returns A new Budgets object where each patched axis has been reduced by the corresponding amount and clamped to a minimum of 0
+ */
 export function debit(
   b: Budgets,
   patch: Partial<Pick<

@@ -68,6 +68,12 @@ export class ScopePolicy {
   }
 }
 
+/**
+ * Convert a ScopeDecision into a ValidationResult.
+ *
+ * @param d - The scope decision produced by scope evaluation
+ * @returns `{ ok: true }` when `d.allowed` is true; otherwise `{ ok: false, errorCode: "scope_denied", message }` where `message` is the decision reasons joined by `"; "`
+ */
 export function scopeDecisionToValidation(d: ScopeDecision): ValidationResult {
   if (d.allowed) return { ok: true };
   return {

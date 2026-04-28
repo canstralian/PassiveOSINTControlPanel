@@ -33,6 +33,18 @@ export type StopInputs = {
   failClosed: boolean;
 };
 
+/**
+ * Determines whether processing should stop and collects all matching stop reasons.
+ *
+ * Evaluates a set of stop conditions (fail-closed, manual stop requested, budget exhaustion,
+ * no admissible actions, top-action score below threshold, validated top hypothesis,
+ * and all active hypotheses falsified) and returns which reasons were triggered.
+ *
+ * @param inputs - Inputs used to evaluate stop conditions (budgets, admissible action count,
+ *   top action score and threshold, hypothesis flags, manual/Fail-closed flags).
+ * @returns An object containing `shouldStop` (`true` if at least one reason was detected,
+ *   `false` otherwise) and `reasons` (an array of all matched `StopReason` values).
+ */
 export function evaluateStop(inputs: StopInputs): StopSignal {
   const reasons: StopReason[] = [];
   if (inputs.failClosed) reasons.push("fail_closed");
@@ -53,7 +65,13 @@ export function evaluateStop(inputs: StopInputs): StopSignal {
   return { shouldStop: reasons.length > 0, reasons };
 }
 
-/** Generate a `stop_and_report` candidate action so it is always considered. */
+/**
+ * Create a `stop_and_report` candidate action for the given investigation.
+ *
+ * @param investigationId - Identifier of the investigation to attach the candidate to
+ * @param now - Timestamp used for the candidate's `createdAt` (defaults to current time)
+ * @returns A `CandidateAction` configured to stop processing and emit the final report
+ */
 export function makeStopCandidate(investigationId: string, now: Date = new Date()): CandidateAction {
   return {
     id: newActionId(),

@@ -58,6 +58,17 @@ export type ExternalActionRequest = {
   actor: string;
 };
 
+/**
+ * Execute a gated external tool call pipeline for an investigation action.
+ *
+ * Runs input validation, scope evaluation, risk classification, optional approval,
+ * audit logging (pre- and post-execution), tool invocation, result validation,
+ * and emits a domain event on validated success.
+ *
+ * @param deps - Collaborators required to run the pipeline (scopePolicy, riskClassifier, approvalGate, auditLogger, toolGateway, resultValidator, eventLogger)
+ * @param req - The request containing `investigation`, `action` (must be `external_tool_call` with `toolRef`), and `actor`
+ * @returns On success: `{ ok: true, result: ToolResultEnvelope, validation: ValidationResult }`. On failure: `{ ok: false, stage: "scope" | "risk" | "approval" | "audit" | "tool" | "result_validation" | "input", validation: ValidationResult, failClosed: boolean }`
+ */
 export async function runExternalAction(
   deps: ExternalActionDeps,
   req: ExternalActionRequest

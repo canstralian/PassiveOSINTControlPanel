@@ -125,6 +125,13 @@ export class Controller {
   }
 }
 
+/**
+ * Produce updated budgets after applying an action's estimated cost and resource usage.
+ *
+ * @param budgets - Current budgets to debit from
+ * @param action - Candidate action whose estimatedCost, estimatedLatencyMs, and kind determine decrements
+ * @returns Updated Budgets with decremented fields: `costRemaining`, `latencyMsRemaining`, `actionsRemaining`, and `toolCallsRemaining` (tool calls decremented only for `external_tool_call`). All decremented values are clamped at 0.
+ */
 export function debitForAction(
   budgets: Budgets,
   action: CandidateAction

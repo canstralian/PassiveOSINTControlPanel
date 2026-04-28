@@ -37,6 +37,14 @@ export type StateMutationOutcome<O> =
       validation: ValidationResult;
     };
 
+/**
+ * Executes a guarded state mutation: validate input, record an audit entry, run the domain service, validate output, and optionally emit a post-mutation event.
+ *
+ * The function never performs the mutation before a successful audit record. On failure it returns structured diagnostic information including the failing stage (`"input" | "audit" | "service" | "output_validation"`), a `failClosed` flag indicating whether the mutation was refused for safety, and a validation result with an `errorCode` and message.
+ *
+ * @param req - Request describing actor/investigation/operation metadata, Zod `inputSchema` and `outputSchema` with corresponding `input`, the `service` to execute, and optional `eventKind`/`eventPayload` for emitting a low-cost event on success.
+ * @returns On success: `{ ok: true, output, validation: { ok: true } }`. On failure: `{ ok: false, stage, failClosed, validation: { ok: false, errorCode, message } }` where `stage` identifies the step that failed.
+ */
 export async function runStateMutation<I, O>(
   deps: { auditLogger: AuditLogger; eventLogger: EventLogger },
   req: StateMutationRequest<I, O>

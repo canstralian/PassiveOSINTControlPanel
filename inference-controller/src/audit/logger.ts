@@ -124,8 +124,10 @@ export class AuditLogger {
 }
 
 /**
- * Verify the chain of integrity markers across an ordered list of events.
- * The first event's integrity marker is computed from "GENESIS".
+ * Checks integrity markers across an ordered list of audit events.
+ *
+ * @param events - Ordered array of audit events to verify (earlier events first)
+ * @returns An object with `ok: true` when every event's `integrityMarker` matches the recomputed value; otherwise `ok: false` and `brokenAt` set to the index of the first event whose marker does not match
  */
 export function verifyAuditChain(events: AuditEvent[]): { ok: boolean; brokenAt?: number } {
   let previous = "GENESIS";

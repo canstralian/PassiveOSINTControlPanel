@@ -80,15 +80,38 @@ export class IllegalLifecycleTransitionError extends Error {
   }
 }
 
+/**
+ * Determine whether a transition from one lifecycle state to another is allowed.
+ *
+ * Identical `from` and `to` states are not considered legal transitions.
+ *
+ * @param from - The current lifecycle state
+ * @param to - The desired next lifecycle state
+ * @returns `true` if `to` is an allowed next state from `from`, `false` otherwise.
+ */
 export function isLegalTransition(from: LifecycleState, to: LifecycleState): boolean {
   if (from === to) return false;
   return TRANSITIONS[from].has(to);
 }
 
+/**
+ * List allowed next lifecycle states for a given current state.
+ *
+ * @param from - The current lifecycle state
+ * @returns An array of lifecycle states that may follow `from`; empty if there are no allowed next states
+ */
 export function legalNextStates(from: LifecycleState): readonly LifecycleState[] {
   return Array.from(TRANSITIONS[from]);
 }
 
+/**
+ * Validate and apply a lifecycle state transition.
+ *
+ * @param current - The current lifecycle state.
+ * @param next - The desired next lifecycle state.
+ * @returns The `next` lifecycle state when the transition is permitted.
+ * @throws {IllegalLifecycleTransitionError} When the transition from `current` to `next` is not allowed.
+ */
 export function applyTransition(
   current: LifecycleState,
   next: LifecycleState

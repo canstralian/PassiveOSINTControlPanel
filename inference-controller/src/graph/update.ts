@@ -167,7 +167,14 @@ export class BeliefGraphUpdater {
   }
 }
 
-/** Bayesian update on P(H) given P(E|H) and P(E|¬H). */
+/**
+ * Compute the posterior probability P(H|E) from a prior P(H) and likelihoods P(E|H) and P(E|¬H).
+ *
+ * @param prior - Prior probability P(H), expected in [0, 1]
+ * @param likelihoodH - Likelihood P(E|H), expected in [0, 1]
+ * @param likelihoodNotH - Likelihood P(E|¬H), expected in [0, 1]
+ * @returns The posterior probability P(H|E); if the Bayesian denominator is zero the input `prior` is returned, and the result is clamped to the interval [1e-9, 1 - 1e-9]
+ */
 export function bayesUpdate(
   prior: number,
   likelihoodH: number,
