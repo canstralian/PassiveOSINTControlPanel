@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 from types import SimpleNamespace
+
+import pytest
 
 from osint_core.trust import (
     TrustDelta,
@@ -11,7 +15,7 @@ from osint_core.trust import (
 )
 
 
-def test_negative_trust_delta_applies_at_full_strength():
+def test_negative_trust_delta_applies_at_full_strength() -> None:
     state = TrustState(
         component_id="module:resource_links",
         component_type="module",
@@ -35,7 +39,7 @@ def test_negative_trust_delta_applies_at_full_strength():
     assert updated.last_repair_action == "constrain"
 
 
-def test_positive_trust_delta_recovers_slowly():
+def test_positive_trust_delta_recovers_slowly() -> None:
     state = TrustState(
         component_id="workflow:hf-sync",
         component_type="workflow",
@@ -53,11 +57,11 @@ def test_positive_trust_delta_recovers_slowly():
 
     updated = apply_trust_delta(state, delta)
 
-    assert updated.trust_score == 0.675
+    assert updated.trust_score == pytest.approx(0.675)
     assert updated.verification_depth == "elevated"
 
 
-def test_trust_may_not_expand_authority_automatically():
+def test_trust_may_not_expand_authority_automatically() -> None:
     state = TrustState(
         component_id="module:resource_links",
         component_type="module",
@@ -76,11 +80,11 @@ def test_trust_may_not_expand_authority_automatically():
 
     updated = apply_trust_delta(state, delta)
 
-    assert updated.trust_score == 1.0
+    assert updated.trust_score == pytest.approx(1.0)
     assert updated.permission_scope == "passive"
 
 
-def test_trust_can_reduce_authority_automatically():
+def test_trust_can_reduce_authority_automatically() -> None:
     state = TrustState(
         component_id="module:http_headers",
         component_type="module",
@@ -103,7 +107,7 @@ def test_trust_can_reduce_authority_automatically():
     assert updated.verification_depth == "quarantined"
 
 
-def test_permission_scope_derivation_never_broadens_current_scope():
+def test_permission_scope_derivation_never_broadens_current_scope() -> None:
     assert derive_permission_scope(0.95, "restricted") == "restricted"
     assert derive_permission_scope(0.95, "passive") == "passive"
     assert derive_permission_scope(0.95, "conditional") == "conditional"
@@ -111,14 +115,14 @@ def test_permission_scope_derivation_never_broadens_current_scope():
     assert derive_permission_scope(0.1, "conditional") == "blocked"
 
 
-def test_verification_depth_thresholds():
+def test_verification_depth_thresholds() -> None:
     assert derive_verification_depth(0.1) == "quarantined"
     assert derive_verification_depth(0.3) == "strict"
     assert derive_verification_depth(0.6) == "elevated"
     assert derive_verification_depth(0.9) == "normal"
 
 
-def test_calculate_trust_delta_penalizes_revert_drift():
+def test_calculate_trust_delta_penalizes_revert_drift() -> None:
     assessment = SimpleNamespace(
         recommended_correction="REVERT",
         confidence=0.9,
@@ -133,12 +137,12 @@ def test_calculate_trust_delta_penalizes_revert_drift():
     )
 
     assert delta.source == "drift"
-    assert delta.score_delta == -0.9
+    assert delta.score_delta == pytest.approx(-0.9)
     assert delta.repair_action == "rollback"
     assert delta.evidence["dominant_drift_type"] == "structural"
 
 
-def test_calculate_trust_delta_rewards_clean_drift_only_slightly():
+def test_calculate_trust_delta_rewards_clean_drift_only_slightly() -> None:
     assessment = SimpleNamespace(
         recommended_correction="OBSERVE",
         confidence=0.0,
@@ -152,11 +156,11 @@ def test_calculate_trust_delta_rewards_clean_drift_only_slightly():
         drift_assessment=assessment,
     )
 
-    assert delta.score_delta == 0.12
+    assert delta.score_delta == pytest.approx(0.12)
     assert delta.repair_action == "observe"
 
 
-def test_calculate_trust_delta_quarantines_failed_audit():
+def test_calculate_trust_delta_quarantines_failed_audit() -> None:
     delta = calculate_trust_delta(
         component_id="audit:ledger",
         component_type="service",
@@ -164,11 +168,46 @@ def test_calculate_trust_delta_quarantines_failed_audit():
     )
 
     assert delta.source == "audit"
-    assert delta.score_delta == -0.7
+    assert delta.score_delta == pytest.approx(-0.7)
     assert delta.repair_action == "quarantine"
 
 
-def test_scheduler_routes_by_trust_and_risk():
+def test_audit_trust_delta_excludes_raw_indicator_fields() -> None:
+    delta = calculate_trust_delta(
+        component_id="audit:ledger",
+        component_type="service",
+        audit_result={
+            "audit_safe": False,
+            "raw_indicator": "1.2.3.4",
+            "raw_indicator_type": "ip",
+            "raw_indicator_value": "sensitive",
+        },
+    )
+
+    assert delta.source == "audit"
+    assert delta.score_delta == pytest.approx(-0.7)
+    assert delta.repair_action == "quarantine"
+    assert "raw_indicator" not in delta.evidence
+    assert "raw_indicator_type" not in delta.evidence
+    assert "raw_indicator_value" not in delta.evidence
+    assert "1.2.3.4" not in str(delta.evidence)
+    assert "sensitive" not in str(delta.evidence)
+
+
+def test_strictest_repair_action_is_preserved() -> None:
+    delta = calculate_trust_delta(
+        component_id="audit:ledger",
+        component_type="service",
+        audit_result={"audit_safe": False},
+        ci_result={"passed": False},
+    )
+
+    assert delta.source == "ci"
+    assert delta.score_delta == pytest.approx(-1.0)
+    assert delta.repair_action == "quarantine"
+
+
+def test_scheduler_routes_by_trust_and_risk() -> None:
     high = TrustState(
         component_id="workflow:hf-sync",
         component_type="workflow",
