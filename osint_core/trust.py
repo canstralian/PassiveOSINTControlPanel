@@ -36,6 +36,15 @@ HIGH_TRUST_SCORE = 0.8
 NEGATIVE_MULTIPLIER = 1.0
 POSITIVE_MULTIPLIER = 0.35
 
+REPAIR_ACTION_SEVERITY: dict[RepairAction, int] = {
+    "none": 0,
+    "observe": 1,
+    "adapt": 1,
+    "constrain": 2,
+    "rollback": 3,
+    "quarantine": 4,
+}
+
 
 @dataclass(frozen=True)
 class TrustDelta:
@@ -90,6 +99,13 @@ def clamp_score(value: float) -> float:
     return max(TRUST_MIN, min(TRUST_MAX, float(value)))
 
 
+def stricter_repair_action(current: RepairAction, candidate: RepairAction) -> RepairAction:
+    """Return the repair action with higher containment severity."""
+    if REPAIR_ACTION_SEVERITY[candidate] > REPAIR_ACTION_SEVERITY[current]:
+        return candidate
+    return current
+
+
 def calculate_trust_delta(
     *,
     component_id: str,
@@ -130,15 +146,16 @@ def calculate_trust_delta(
 
         if correction in {"REVERT", "CONSTRAIN"}:
             raw_delta -= max(0.2, confidence)
-            repair_action = "rollback" if correction == "REVERT" else "constrain"
+            candidate: RepairAction = "rollback" if correction == "REVERT" else "constrain"
+            repair_action = stricter_repair_action(repair_action, candidate)
             reasons.append(f"drift recommended {correction}")
         elif signal_count == 0:
             raw_delta += 0.12
-            repair_action = "observe"
+            repair_action = stricter_repair_action(repair_action, "observe")
             reasons.append("no drift signals detected")
         elif correction == "ADAPT":
             raw_delta += 0.04
-            repair_action = "adapt"
+            repair_action = stricter_repair_action(repair_action, "adapt")
             reasons.append("adaptive drift signal observed")
 
     if reconciliation_result:
@@ -149,7 +166,7 @@ def calculate_trust_delta(
         evidence["violation_count"] = violations
         if violations or blocked:
             raw_delta -= min(0.6, 0.15 * max(blocked, violations))
-            repair_action = "constrain"
+            repair_action = stricter_repair_action(repair_action, "constrain")
             reasons.append("constraint reconciliation blocked actions")
         else:
             raw_delta += 0.06
@@ -161,7 +178,7 @@ def calculate_trust_delta(
         evidence["audit_safe"] = audit_safe
         if not audit_safe:
             raw_delta -= 0.7
-            repair_action = "quarantine"
+            repair_action = stricter_repair_action(repair_action, "quarantine")
             reasons.append("audit safety failed")
         else:
             raw_delta += 0.04
@@ -176,7 +193,7 @@ def calculate_trust_delta(
             reasons.append("CI passed")
         else:
             raw_delta -= 0.5
-            repair_action = "constrain"
+            repair_action = stricter_repair_action(repair_action, "constrain")
             reasons.append("CI failed")
 
     if not reasons:
