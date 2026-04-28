@@ -1,4 +1,4 @@
-"""""
+"""
 osint_core.trust
 ================
 
@@ -272,4 +272,3 @@ def scheduler_context_from_trust(state: TrustState) -> dict[str, Any]:
         "permission_scope": state.permission_scope,
         "authority_scale": authority_scale_from_trust(state.trust_score),
     }
-    return "FAST"
