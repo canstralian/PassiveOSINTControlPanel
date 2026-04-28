@@ -1,297 +1,274 @@
-"""
 osint_core.trust
 ================
 
-Bounded trust scoring for the Passive OSINT Control Panel.
+Self-healing trust fabric primitives.
 
-The first trust-fabric layer is intentionally small:
+Converts drift, reconciliation, audit, and CI signals into rolling
+component-level trust state.
 
-    observe -> score -> persist -> report
-
-It does not expand authority. Trust may reduce authority automatically, but it
-may not increase authority automatically.
+Rules:
+- Trust may reduce authority automatically.
+- Trust may not expand authority automatically.
+- Trust loss is fast.
+- Trust recovery is slow.
+- Structural/policy/adversarial drift causes sharper trust loss.
+- Statistical drift accumulates slowly.
+- Raw indicators must never be stored in trust events.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from dataclasses import dataclass, field, replace
+from enum import Enum
 from typing import Any, Literal
 
 
-ComponentType = Literal["model", "service", "module", "workflow", "hardware", "policy"]
-TrustSource = Literal["verification", "drift", "constraint", "audit", "ci", "operator"]
+ComponentType = Literal["model", "service", "module", "workflow", "hardware", "policy", "system"]
+TrustSource = Literal["verification", "drift", "constraint", "audit", "ci", "operator", "reconciliation"]
 RepairAction = Literal["none", "observe", "constrain", "rollback", "quarantine", "adapt"]
 VerificationDepth = Literal["normal", "elevated", "strict", "quarantined"]
 PermissionScope = Literal["passive", "conditional", "restricted", "blocked"]
-SchedulerRoute = Literal["FAST", "DELIBERATIVE", "CONTAINMENT", "FAIL_CLOSED"]
 
-TRUST_MIN = 0.0
-TRUST_MAX = 1.0
-DEFAULT_TRUST_SCORE = 0.6
-COLLAPSED_TRUST_SCORE = 0.2
-LOW_TRUST_SCORE = 0.4
-HIGH_TRUST_SCORE = 0.8
 
-NEGATIVE_MULTIPLIER = 1.0
-POSITIVE_MULTIPLIER = 0.35
-
-REPAIR_ACTION_SEVERITY: dict[RepairAction, int] = {
-    "none": 0,
-    "observe": 1,
-    "adapt": 1,
-    "constrain": 2,
-    "rollback": 3,
-    "quarantine": 4,
-}
-
-PERMISSION_SCOPE_RANK: dict[PermissionScope, int] = {
-    "conditional": 3,
-    "passive": 2,
-    "restricted": 1,
-    "blocked": 0,
-}
+class TrustReason(str, Enum):
+    CLEAN_EXECUTION = "clean_execution"
+    POLICY_VIOLATION = "policy_violation"
+    STRUCTURAL_DRIFT = "structural_drift"
+    BEHAVIORAL_DRIFT = "behavioral_drift"
+    ADVERSARIAL_DRIFT = "adversarial_drift"
+    OPERATIONAL_DRIFT = "operational_drift"
+    STATISTICAL_DRIFT = "statistical_drift"
+    OBSERVER_DISSENT = "observer_dissent"
+    CI_PASSED = "ci_passed"
+    CI_FAILED = "ci_failed"
+    REPAIR_SUCCEEDED = "repair_succeeded"
 
 
 @dataclass(frozen=True)
 class TrustDelta:
-    """One evidence-backed trust movement for a component."""
-
     component_id: str
     component_type: ComponentType
     source: TrustSource
     score_delta: float
     reason: str
-    evidence: dict[str, Any]
+    evidence: dict[str, Any] = field(default_factory=dict)
     repair_action: RepairAction = "none"
-    timestamp: str = ""
-
-    def normalized(self) -> "TrustDelta":
-        """Clamp delta to [-1.0, 1.0] and attach a timestamp when missing."""
-        bounded = max(-1.0, min(1.0, float(self.score_delta)))
-        return replace(
-            self,
-            score_delta=bounded,
-            timestamp=self.timestamp or datetime.now(timezone.utc).isoformat(),
-        )
 
 
 @dataclass(frozen=True)
 class TrustState:
-    """Rolling trust state for a component."""
-
     component_id: str
     component_type: ComponentType
-    trust_score: float = DEFAULT_TRUST_SCORE
+    trust_score: float = 1.0
     verification_depth: VerificationDepth = "normal"
     permission_scope: PermissionScope = "passive"
     last_repair_action: RepairAction | None = None
     evidence_count: int = 0
-    updated_at: str = ""
-
-    def normalized(self) -> "TrustState":
-        """Clamp score and derive safety fields from the current trust value."""
-        score = clamp_score(self.trust_score)
-        return replace(
-            self,
-            trust_score=score,
-            verification_depth=derive_verification_depth(score),
-            permission_scope=derive_permission_scope(score, self.permission_scope),
-            updated_at=self.updated_at or datetime.now(timezone.utc).isoformat(),
-        )
 
 
-def clamp_score(value: float) -> float:
-    """Clamp a trust score to [0.0, 1.0]."""
-    return max(TRUST_MIN, min(TRUST_MAX, float(value)))
+@dataclass(frozen=True)
+class TrustProfile:
+    recovery_rate: float = 0.25
+    decay_rate: float = 1.0
+    statistical_weight: float = 0.10
+    operational_weight: float = 0.25
+    adversarial_weight: float = 0.60
+    structural_weight: float = 0.90
+    policy_weight: float = 0.90
+    behavioral_weight: float = 0.70
+    clean_run_reward: float = 0.02
+    ci_pass_reward: float = 0.03
+    repair_reward: float = 0.04
+    minimum_score: float = 0.0
+    maximum_score: float = 1.0
 
 
-def stricter_repair_action(current: RepairAction, candidate: RepairAction) -> RepairAction:
-    """Return the repair action with higher containment severity."""
-    if REPAIR_ACTION_SEVERITY[candidate] > REPAIR_ACTION_SEVERITY[current]:
-        return candidate
-    return current
+DEFAULT_PROFILE = TrustProfile()
 
 
-def calculate_trust_delta(
-    *,
-    component_id: str,
-    component_type: ComponentType,
-    drift_assessment: Any | None = None,
-    reconciliation_result: dict[str, Any] | None = None,
-    audit_result: dict[str, Any] | None = None,
-    ci_result: dict[str, Any] | None = None,
-) -> TrustDelta:
-    """Calculate one trust delta from runtime evidence.
-
-    Priority is conservative: policy, structural, behavioral, or adversarial
-    drift dominates positive evidence. Clean evidence can only produce a small
-    positive delta.
-    """
-    reasons: list[str] = []
-    evidence: dict[str, Any] = {}
-    source: TrustSource = "verification"
-    repair_action: RepairAction = "observe"
-    raw_delta = 0.0
-
-    if drift_assessment is not None:
-        source = "drift"
-        correction = str(getattr(drift_assessment, "recommended_correction", "OBSERVE"))
-        confidence = float(getattr(drift_assessment, "confidence", 0.0))
-        dominant = getattr(drift_assessment, "dominant_type", None)
-        dominant_value = getattr(dominant, "value", None) or str(dominant) if dominant else None
-        signal_count = len(getattr(drift_assessment, "signals", []) or [])
-
-        evidence.update(
-            {
-                "dominant_drift_type": dominant_value,
-                "recommended_correction": correction,
-                "confidence": confidence,
-                "signal_count": signal_count,
-            }
-        )
-
-        if correction in {"REVERT", "CONSTRAIN"}:
-            raw_delta -= max(0.2, confidence)
-            candidate: RepairAction = "rollback" if correction == "REVERT" else "constrain"
-            repair_action = stricter_repair_action(repair_action, candidate)
-            reasons.append(f"drift recommended {correction}")
-        elif signal_count == 0:
-            raw_delta += 0.12
-            repair_action = stricter_repair_action(repair_action, "observe")
-            reasons.append("no drift signals detected")
-        elif correction == "ADAPT":
-            raw_delta += 0.04
-            repair_action = stricter_repair_action(repair_action, "adapt")
-            reasons.append("adaptive drift signal observed")
-
-    if reconciliation_result:
-        source = "constraint"
-        blocked = int(reconciliation_result.get("blocked_count", 0) or 0)
-        violations = int(reconciliation_result.get("violation_count", 0) or 0)
-        evidence["blocked_count"] = blocked
-        evidence["violation_count"] = violations
-        if violations or blocked:
-            raw_delta -= min(0.6, 0.15 * max(blocked, violations))
-            repair_action = stricter_repair_action(repair_action, "constrain")
-            reasons.append("constraint reconciliation blocked actions")
-        else:
-            raw_delta += 0.06
-            reasons.append("constraint reconciliation clean")
-
-    if audit_result:
-        source = "audit"
-        audit_safe = bool(audit_result.get("audit_safe", False))
-        evidence["audit_safe"] = audit_safe
-        if not audit_safe:
-            raw_delta -= 0.7
-            repair_action = stricter_repair_action(repair_action, "quarantine")
-            reasons.append("audit safety failed")
-        else:
-            raw_delta += 0.04
-            reasons.append("audit safety passed")
-
-    if ci_result:
-        source = "ci"
-        passed = bool(ci_result.get("passed", False))
-        evidence["ci_passed"] = passed
-        if passed:
-            raw_delta += 0.08
-            reasons.append("CI passed")
-        else:
-            raw_delta -= 0.5
-            repair_action = stricter_repair_action(repair_action, "constrain")
-            reasons.append("CI failed")
-
-    if not reasons:
-        reasons.append("no decisive trust evidence")
-
-    return TrustDelta(
-        component_id=component_id,
-        component_type=component_type,
-        source=source,
-        score_delta=raw_delta,
-        reason="; ".join(reasons),
-        evidence=evidence,
-        repair_action=repair_action,
-    ).normalized()
-
-
-def apply_trust_delta(state: TrustState, delta: TrustDelta) -> TrustState:
-    """Apply asymmetric trust movement to a state.
-
-    Negative deltas apply at full strength. Positive deltas recover slowly.
-    Permission scope is derived conservatively and cannot become broader than
-    the existing scope through this automatic path.
-    """
-    normalized_state = state.normalized()
-    normalized_delta = delta.normalized()
-
-    multiplier = NEGATIVE_MULTIPLIER if normalized_delta.score_delta < 0 else POSITIVE_MULTIPLIER
-    next_score = clamp_score(
-        normalized_state.trust_score + (normalized_delta.score_delta * multiplier)
-    )
-    next_scope = derive_permission_scope(next_score, normalized_state.permission_scope)
-
-    return TrustState(
-        component_id=normalized_state.component_id,
-        component_type=normalized_state.component_type,
-        trust_score=next_score,
-        verification_depth=derive_verification_depth(next_score),
-        permission_scope=next_scope,
-        last_repair_action=normalized_delta.repair_action,
-        evidence_count=normalized_state.evidence_count + 1,
-        updated_at=datetime.now(timezone.utc).isoformat(),
-    )
+def clamp_score(value: float, profile: TrustProfile = DEFAULT_PROFILE) -> float:
+    return max(profile.minimum_score, min(profile.maximum_score, value))
 
 
 def derive_verification_depth(trust_score: float) -> VerificationDepth:
-    """Map score to verification depth."""
-    score = clamp_score(trust_score)
-    if score <= COLLAPSED_TRUST_SCORE:
+    if trust_score < 0.10:
         return "quarantined"
-    if score <= LOW_TRUST_SCORE:
+    if trust_score < 0.40:
         return "strict"
-    if score < HIGH_TRUST_SCORE:
+    if trust_score < 0.75:
         return "elevated"
     return "normal"
 
 
-def derive_permission_scope(
-    trust_score: float,
-    current_scope: PermissionScope = "passive",
-) -> PermissionScope:
-    """Map score to permission scope without automatic authority expansion."""
-    score = clamp_score(trust_score)
+def derive_permission_scope(trust_score: float) -> PermissionScope:
+    if trust_score < 0.10:
+        return "blocked"
+    if trust_score < 0.40:
+        return "restricted"
+    if trust_score < 0.75:
+        return "conditional"
+    return "passive"
 
-    if score <= COLLAPSED_TRUST_SCORE:
-        candidate: PermissionScope = "blocked"
-    elif score <= LOW_TRUST_SCORE:
-        candidate = "restricted"
-    elif score < HIGH_TRUST_SCORE:
-        candidate = "passive"
+
+def apply_trust_delta(
+    state: TrustState,
+    delta: TrustDelta,
+    profile: TrustProfile = DEFAULT_PROFILE,
+) -> TrustState:
+    if delta.score_delta >= 0:
+        adjusted = delta.score_delta * profile.recovery_rate
     else:
-        candidate = current_scope
+        adjusted = delta.score_delta * profile.decay_rate
 
-    return narrower_scope(current_scope, candidate)
+    new_score = clamp_score(state.trust_score + adjusted, profile)
+
+    return replace(
+        state,
+        trust_score=new_score,
+        verification_depth=derive_verification_depth(new_score),
+        permission_scope=derive_permission_scope(new_score),
+        last_repair_action=delta.repair_action,
+        evidence_count=state.evidence_count + 1,
+    )
 
 
-def narrower_scope(current: PermissionScope, candidate: PermissionScope) -> PermissionScope:
-    """Return the more restrictive permission scope."""
-    return current if PERMISSION_SCOPE_RANK[current] <= PERMISSION_SCOPE_RANK[candidate] else candidate
+def apply_trust_deltas(
+    state: TrustState,
+    deltas: tuple[TrustDelta, ...],
+    profile: TrustProfile = DEFAULT_PROFILE,
+) -> TrustState:
+    next_state = state
+    for delta in deltas:
+        next_state = apply_trust_delta(next_state, delta, profile)
+    return next_state
 
 
-def derive_scheduler_route(
+def get_vector_value(vector: Any, key: str) -> float:
+    if isinstance(vector, dict):
+        return float(vector.get(key, 0.0) or 0.0)
+    return float(getattr(vector, key, 0.0) or 0.0)
+
+
+def trust_delta_from_drift(
     *,
-    risk: Literal["low", "medium", "high", "critical"],
-    trust_state: TrustState,
-) -> SchedulerRoute:
-    """Route scheduler decisions using trust and risk."""
-    state = trust_state.normalized()
-    if state.permission_scope == "blocked" or state.verification_depth == "quarantined":
-        return "FAIL_CLOSED"
-    if state.permission_scope == "restricted" or risk in {"critical", "high"}:
-        return "CONTAINMENT"
-    if state.verification_depth == "elevated" or risk == "medium":
-        return "DELIBERATIVE"
+    component_id: str,
+    component_type: ComponentType,
+    drift_assessment: Any,
+    profile: TrustProfile = DEFAULT_PROFILE,
+) -> tuple[TrustDelta, ...]:
+    vector = getattr(drift_assessment, "drift_vector", drift_assessment)
+
+    values = {
+        "policy": get_vector_value(vector, "policy"),
+        "structural": get_vector_value(vector, "structural"),
+        "behavioral": get_vector_value(vector, "behavioral"),
+        "adversarial": get_vector_value(vector, "adversarial"),
+        "operational": get_vector_value(vector, "operational"),
+        "statistical": get_vector_value(vector, "statistical"),
+    }
+
+    deltas: list[TrustDelta] = []
+
+    mappings = [
+        ("policy", profile.policy_weight, TrustReason.POLICY_VIOLATION.value, "rollback"),
+        ("structural", profile.structural_weight, TrustReason.STRUCTURAL_DRIFT.value, "rollback"),
+        ("behavioral", profile.behavioral_weight, TrustReason.BEHAVIORAL_DRIFT.value, "constrain"),
+        ("adversarial", profile.adversarial_weight, TrustReason.ADVERSARIAL_DRIFT.value, "constrain"),
+        ("operational", profile.operational_weight, TrustReason.OPERATIONAL_DRIFT.value, "observe"),
+        ("statistical", profile.statistical_weight, TrustReason.STATISTICAL_DRIFT.value, "adapt"),
+    ]
+
+    for drift_type, weight, reason, repair_action in mappings:
+        value = values[drift_type]
+        if value > 0:
+            deltas.append(
+                TrustDelta(
+                    component_id=component_id,
+                    component_type=component_type,
+                    source="drift",
+                    score_delta=-(value * weight),
+                    reason=reason,
+                    evidence={drift_type: value},
+                    repair_action=repair_action,
+                )
+            )
+
+    if not deltas:
+        deltas.append(
+            TrustDelta(
+                component_id=component_id,
+                component_type=component_type,
+                source="verification",
+                score_delta=profile.clean_run_reward,
+                reason=TrustReason.CLEAN_EXECUTION.value,
+                evidence={"drift": "none"},
+                repair_action="none",
+            )
+        )
+
+    return tuple(deltas)
+
+
+def trust_delta_from_reconciliation(
+    *,
+    component_id: str,
+    component_type: ComponentType,
+    reconciliation_result: Any,
+) -> TrustDelta:
+    correction = str(getattr(reconciliation_result, "correction", "")).upper()
+
+    if correction == "OBSERVE":
+        return TrustDelta(component_id, component_type, "reconciliation", 0.02, TrustReason.CLEAN_EXECUTION.value, {"correction": correction}, "none")
+    if correction == "ADAPT":
+        return TrustDelta(component_id, component_type, "reconciliation", -0.02, TrustReason.STATISTICAL_DRIFT.value, {"correction": correction}, "adapt")
+    if correction == "CONSTRAIN":
+        return TrustDelta(component_id, component_type, "reconciliation", -0.20, TrustReason.OBSERVER_DISSENT.value, {"correction": correction}, "constrain")
+    if correction == "REVERT":
+        return TrustDelta(component_id, component_type, "reconciliation", -0.50, TrustReason.BEHAVIORAL_DRIFT.value, {"correction": correction}, "rollback")
+
+    return TrustDelta(component_id, component_type, "reconciliation", -0.80, TrustReason.STRUCTURAL_DRIFT.value, {"correction": correction}, "quarantine")
+
+
+def trust_delta_from_ci(
+    *,
+    workflow_id: str,
+    passed: bool,
+    profile: TrustProfile = DEFAULT_PROFILE,
+) -> TrustDelta:
+    if passed:
+        return TrustDelta(workflow_id, "workflow", "ci", profile.ci_pass_reward, TrustReason.CI_PASSED.value, {"passed": True}, "none")
+
+    return TrustDelta(workflow_id, "workflow", "ci", -0.40, TrustReason.CI_FAILED.value, {"passed": False}, "constrain")
+
+
+def initial_trust_state(component_id: str, component_type: ComponentType = "module") -> TrustState:
+    return TrustState(
+        component_id=component_id,
+        component_type=component_type,
+        trust_score=1.0,
+        verification_depth="normal",
+        permission_scope="passive",
+        last_repair_action=None,
+        evidence_count=0,
+    )
+
+
+def authority_scale_from_trust(trust_score: float) -> float:
+    if trust_score < 0.10:
+        return 0.0
+    if trust_score < 0.40:
+        return 0.25
+    if trust_score < 0.75:
+        return 0.50
+    return 1.0
+
+
+def scheduler_context_from_trust(state: TrustState) -> dict[str, Any]:
+    return {
+        "component_id": state.component_id,
+        "trust_score": state.trust_score,
+        "verification_depth": state.verification_depth,
+        "permission_scope": state.permission_scope,
+        "authority_scale": authority_scale_from_trust(state.trust_score),
+    }
     return "FAST"
