@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
@@ -18,6 +19,16 @@ README_PATH = Path(__file__).resolve().parents[1] / "README.md"
 @pytest.fixture(scope="module")
 def readme_text() -> str:
     return README_PATH.read_text()
+
+
+def extract_git_clone_urls(block: str) -> list[str]:
+    """Extract URLs from git clone commands in a shell snippet."""
+    urls: list[str] = []
+    for line in block.splitlines():
+        parts = line.strip().split()
+        if len(parts) >= 3 and parts[0] == "git" and parts[1] == "clone":
+            urls.append(parts[2])
+    return urls
 
 
 # ---------------------------------------------------------------------------
@@ -125,11 +136,11 @@ def test_local_dev_includes_real_clone_url(readme_text: str) -> None:
     """Clone command must include the actual repository URL, not a placeholder."""
     bash_blocks = re.findall(r"```bash\n(.*?)```", readme_text, re.DOTALL)
     dev_blocks = [b for b in bash_blocks if "git clone" in b]
-    assert dev_blocks, "A git clone command must be present in a bash block"
-    assert not any("git clone <repo>" in b for b in dev_blocks), (
-        "Clone URL must not be a placeholder '<repo>'"
-    )
-    assert any("github.com" in b for b in dev_blocks), (
+    clone_urls = [url for block in dev_blocks for url in extract_git_clone_urls(block)]
+
+    assert clone_urls, "A git clone command must be present in a bash block"
+    assert "<repo>" not in clone_urls, "Clone URL must not be a placeholder '<repo>'"
+    assert any(urlparse(url).hostname == "github.com" for url in clone_urls), (
         "Clone URL must reference the actual GitHub repository"
     )
 
