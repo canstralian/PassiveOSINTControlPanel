@@ -34,7 +34,12 @@ export {
   DEFAULT_WEIGHTS,
 } from "./controller/scoring.js";
 export type { ScoringWeights } from "./controller/scoring.js";
-export { Controller, debitForAction } from "./controller/controller.js";
+export {
+  Controller,
+  ControllerConfigurationError,
+  ControllerOverrideError,
+  debitForAction,
+} from "./controller/controller.js";
 export type { CycleInput, CycleOutput } from "./controller/controller.js";
 export {
   ensureBudgetAvailable,

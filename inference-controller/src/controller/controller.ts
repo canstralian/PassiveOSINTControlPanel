@@ -17,6 +17,20 @@ import { newActionDecisionId } from "../domain/ids.js";
 import { evaluateStop, makeStopCandidate } from "./stop.js";
 import type { ScopePolicy } from "../safety/scope.js";
 
+export class ControllerConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ControllerConfigurationError";
+  }
+}
+
+export class ControllerOverrideError extends Error {
+  constructor(public readonly actionId: string) {
+    super(`override targets non-admissible/non-existent action: ${actionId}`);
+    this.name = "ControllerOverrideError";
+  }
+}
+
 export type CycleInput = {
   investigation: Investigation;
   candidates: CandidateAction[];
@@ -65,7 +79,7 @@ export class Controller {
 
     const top = scored[0];
     if (!top) {
-      throw new Error(
+      throw new ControllerConfigurationError(
         "no admissible actions even with stop_and_report; controller is misconfigured"
       );
     }
@@ -75,9 +89,7 @@ export class Controller {
     if (input.override) {
       const found = scored.find((s) => s.candidate.id === input.override!.actionId);
       if (!found) {
-        throw new Error(
-          `override targets non-admissible/non-existent action: ${input.override.actionId}`
-        );
+        throw new ControllerOverrideError(input.override.actionId);
       }
       selected = found;
       overrideReason = input.override.reason;

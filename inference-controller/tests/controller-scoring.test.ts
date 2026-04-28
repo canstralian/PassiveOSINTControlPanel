@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { Controller } from "../src/controller/controller.js";
+import {
+  Controller,
+  ControllerOverrideError,
+} from "../src/controller/controller.js";
 import { ScopePolicy } from "../src/safety/scope.js";
 import { scoreCandidate } from "../src/controller/scoring.js";
 import { makeAction, makeBudgets, makeInvestigation } from "./_helpers.js";
@@ -84,6 +87,19 @@ describe("controller score decomposition", () => {
     });
     // candidateScores includes the synthetic stop candidate.
     expect(out.decision.candidateScores.length).toBe(2);
+  });
+
+  it("override referencing an unknown action throws a typed error", () => {
+    const inv = makeInvestigation();
+    const a1 = makeAction();
+    expect(() =>
+      new Controller().selectAction({
+        investigation: inv,
+        candidates: [a1],
+        scopePolicy: new ScopePolicy(),
+        override: { actionId: "act_does_not_exist", reason: "test" },
+      })
+    ).toThrow(ControllerOverrideError);
   });
 
   it("budget pressure penalises scores under heavy load", () => {

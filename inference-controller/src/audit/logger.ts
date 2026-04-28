@@ -6,7 +6,7 @@
  * the system has entered fail-closed mode.
  */
 import { createHash } from "node:crypto";
-import { mkdir, appendFile } from "node:fs/promises";
+import { mkdir, appendFile, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AuditEvent } from "../domain/types.js";
 import { AuditEvent as AuditEventSchema } from "../domain/types.js";
@@ -48,7 +48,6 @@ export class JsonlFileAuditSink implements AuditSink {
   }
 
   async read(): Promise<AuditEvent[]> {
-    const { readFile } = await import("node:fs/promises");
     let text: string;
     try {
       text = await readFile(this.path, "utf8");
