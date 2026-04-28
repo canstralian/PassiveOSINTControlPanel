@@ -1,96 +1,60 @@
-version: 1
-name: trust_profiles
-mode: observe_score_persist_report
+# policy/trust_profiles.yaml
+# Trust recovery is intentionally slower than trust loss.
 
-invariants:
-  - trust_may_reduce_authority_automatically
-  - trust_may_not_increase_authority_automatically
-  - high_risk_authority_requires_operator_or_policy_gate
-  - raw_indicators_must_not_enter_trust_evidence
+default:
+  recovery_rate: 0.25
+  decay_rate: 1.0
+  statistical_weight: 0.10
+  operational_weight: 0.25
+  adversarial_weight: 0.60
+  structural_weight: 0.90
+  policy_weight: 0.90
+  behavioral_weight: 0.70
+  clean_run_reward: 0.02
+  ci_pass_reward: 0.03
+  repair_reward: 0.04
 
-score_bounds:
-  min: 0.0
-  max: 1.0
-  default: 0.6
-
-asymmetric_movement:
-  negative_multiplier: 1.0
-  positive_multiplier: 0.35
-  rationale: Trust loss should be fast; trust recovery should be slow.
-
-verification_depths:
-  quarantined:
-    score_lte: 0.2
-    behavior: fail closed or require operator review
-  strict:
-    score_lte: 0.4
-    behavior: containment path with strict verification
-  elevated:
-    score_lt: 0.8
-    behavior: deliberative path with extra checks
+thresholds:
   normal:
-    score_gte: 0.8
-    behavior: normal checks only; does not grant additional authority
+    min_score: 0.75
+    verification_depth: normal
+    permission_scope: passive
+    route: FAST
 
-permission_scopes:
-  blocked:
-    score_lte: 0.2
-    route: FAIL_CLOSED
-  restricted:
-    score_lte: 0.4
-    route: CONTAINMENT
-  passive:
-    score_lt: 0.8
+  elevated:
+    min_score: 0.40
+    verification_depth: elevated
+    permission_scope: conditional
     route: DELIBERATIVE
-  conditional:
-    score_gte: 0.8
-    route: FAST only if already granted by policy or operator gate
 
-sources:
-  verification:
-    positive_examples:
-      - invariant_check_passed
-      - schema_check_passed
-    negative_examples:
-      - invariant_check_failed
-      - hidden_capability_expansion
-  drift:
-    positive_examples:
-      - no_drift_signals
-    negative_examples:
-      - policy_drift
-      - structural_drift
-      - adversarial_drift
-      - behavioral_drift
-  constraint:
-    positive_examples:
-      - no_blocked_actions
-    negative_examples:
-      - forbidden_capability_requested
-      - unauthorized_target_touching_requested
-  audit:
-    positive_examples:
-      - audit_payload_safe
-    negative_examples:
-      - raw_indicator_in_payload
-      - path_traversal_attempt
-  ci:
-    positive_examples:
-      - ci_passed
-    negative_examples:
-      - ci_failed
-      - deployment_sync_failed
+  strict:
+    min_score: 0.10
+    verification_depth: strict
+    permission_scope: restricted
+    route: CONTAINMENT
 
-scheduler_routes:
-  FAST:
-    condition: high trust and low risk
-    behavior: normal passive execution
-  DELIBERATIVE:
-    condition: medium trust or medium risk
-    behavior: extra verification before execution
-  CONTAINMENT:
-    condition: low trust or high risk
-    behavior: reduce scope, isolate outputs, require stricter checks
-  FAIL_CLOSED:
-    condition: collapsed trust or blocked scope
-    behavior: block execution until operator review
+  quarantined:
+    min_score: 0.00
+    verification_depth: quarantined
+    permission_scope: blocked
+    route: FAIL_CLOSED
+
+rules:
+  authority_expansion:
+    automatic: false
+    requires_operator_approval: true
+
+  authority_reduction:
+    automatic: true
+
+  recovery:
+    repeated_clean_behavior_required: true
+    high_risk_authority_never_recovers_automatically: true
+
+  immediate_collapse_triggers:
+    - policy_drift
+    - structural_drift
+    - raw_indicator_leak
+    - forbidden_module_execution
+    - unsigned_intent
+    - manifest_mismatch
