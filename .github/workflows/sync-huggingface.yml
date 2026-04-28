@@ -1,4 +1,4 @@
-name: Two-Way Sync: GitHub ↔ Hugging Face Hub
+name: "Two-Way Sync: GitHub ↔ Hugging Face Hub"
 
 on:
   push:
