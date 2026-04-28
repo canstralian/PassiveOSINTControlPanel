@@ -1,0 +1,60 @@
+# policy/trust_profiles.yaml
+# Trust recovery is intentionally slower than trust loss.
+
+default:
+  recovery_rate: 0.25
+  decay_rate: 1.0
+  statistical_weight: 0.10
+  operational_weight: 0.25
+  adversarial_weight: 0.60
+  structural_weight: 0.90
+  policy_weight: 0.90
+  behavioral_weight: 0.70
+  clean_run_reward: 0.02
+  ci_pass_reward: 0.03
+  repair_reward: 0.04
+
+thresholds:
+  normal:
+    min_score: 0.75
+    verification_depth: normal
+    permission_scope: passive
+    route: FAST
+
+  elevated:
+    min_score: 0.40
+    verification_depth: elevated
+    permission_scope: conditional
+    route: DELIBERATIVE
+
+  strict:
+    min_score: 0.10
+    verification_depth: strict
+    permission_scope: restricted
+    route: CONTAINMENT
+
+  quarantined:
+    min_score: 0.00
+    verification_depth: quarantined
+    permission_scope: blocked
+    route: FAIL_CLOSED
+
+rules:
+  authority_expansion:
+    automatic: false
+    requires_operator_approval: true
+
+  authority_reduction:
+    automatic: true
+
+  recovery:
+    repeated_clean_behavior_required: true
+    high_risk_authority_never_recovers_automatically: true
+
+  immediate_collapse_triggers:
+    - policy_drift
+    - structural_drift
+    - raw_indicator_leak
+    - forbidden_module_execution
+    - unsigned_intent
+    - manifest_mismatch
