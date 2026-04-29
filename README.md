@@ -23,7 +23,6 @@ short_description: Drift-aware, passive OSINT control system.
   <img src="https://img.shields.io/github/last-commit/canstralian/PassiveOSINTControlPanel?logo=github" alt="Last Commit">
   <img src="https://img.shields.io/github/issues/canstralian/PassiveOSINTControlPanel?logo=github" alt="Open Issues">
   <img src="https://img.shields.io/github/license/canstralian/PassiveOSINTControlPanel" alt="License">
-  ![Sync](https://img.shields.io/badge/Sync-setup-lightgrey)
 </p>
 
 # Passive OSINT Control Panel (Hugging Face Space)
