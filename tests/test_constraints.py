@@ -12,6 +12,7 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import replace
+from datetime import datetime, timezone
 
 import pytest
 
@@ -208,6 +209,19 @@ def test_forbidden_outranks_authorization_in_verb_priority():
 # Purity
 # ---------------------------------------------------------------------------
 
+def test_evaluate_constraints_is_deterministic_when_now_is_supplied():
+    fixed = datetime(2030, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    a = evaluate_constraints(_ctx(), now=fixed)
+    b = evaluate_constraints(_ctx(), now=fixed)
+    assert a.timestamp == b.timestamp == "2030-01-02T03:04:05+00:00"
+
+
+def test_constraint_report_carries_context():
+    ctx = _ctx(indicator_hash="h", indicator_type="domain")
+    report = evaluate_constraints(ctx)
+    assert report.context is ctx
+
+
 def test_evaluate_constraints_does_not_mutate_inputs():
     payload = {"indicator_hash": "abc", "modules": ["resource_links"]}
     ctx = _ctx(audit_payload=payload)
@@ -252,13 +266,14 @@ def test_engine_runs_only_supplied_constraints():
 # ---------------------------------------------------------------------------
 
 def test_build_ledger_entry_contains_required_fields():
-    report = evaluate_constraints(_ctx(requested_modules=("Resource Links",)))
-    entry = build_ledger_entry(
-        report,
-        run_id="run_test_001",
-        indicator_hash="hash_xyz",
-        indicator_type="domain",
+    report = evaluate_constraints(
+        _ctx(
+            requested_modules=("Resource Links",),
+            indicator_hash="hash_xyz",
+            indicator_type="domain",
+        )
     )
+    entry = build_ledger_entry(report, run_id="run_test_001")
 
     assert entry["schema_version"] == LEDGER_SCHEMA_VERSION
     assert entry["run_id"] == "run_test_001"
@@ -271,28 +286,33 @@ def test_build_ledger_entry_contains_required_fields():
 
 
 def test_build_ledger_entry_rejects_indicator_typed_as_raw_field():
-    # Defensive: even though we never put raw fields into the entry, prove
-    # that enforce_audit_payload runs by passing a forbidden field through
-    # a malicious replace of the report timestamp into the dict path. We
-    # simulate by building the entry then re-checking.
     report = evaluate_constraints(_ctx(requested_modules=("Resource Links",)))
-    entry = build_ledger_entry(
-        report,
-        run_id="run_test_002",
-        indicator_hash="hash_xyz",
-        indicator_type="domain",
-    )
+    entry = build_ledger_entry(report, run_id="run_test_002")
     forbidden_keys = {"raw_indicator", "raw_input", "indicator", "email", "domain", "username", "url", "ip"}
     assert forbidden_keys.isdisjoint(entry.keys())
 
 
+def test_build_ledger_entry_uses_context_indicator_fields():
+    # Eliminating the redundant args means the entry is sourced from context.
+    report = evaluate_constraints(
+        _ctx(indicator_hash="hash_from_context", indicator_type="ip")
+    )
+    entry = build_ledger_entry(report, run_id="run_test_ctx")
+    assert entry["indicator_hash"] == "hash_from_context"
+    assert entry["indicator_type"] == "ip"
+
+
 def test_write_constraint_ledger_persists_under_runs_constraints(tmp_path):
-    report = evaluate_constraints(_ctx(requested_modules=("Resource Links",)))
+    report = evaluate_constraints(
+        _ctx(
+            requested_modules=("Resource Links",),
+            indicator_hash="hash_persist",
+            indicator_type="domain",
+        )
+    )
     path = write_constraint_ledger(
         report,
         run_id="run_persist_001",
-        indicator_hash="hash_persist",
-        indicator_type="domain",
         base_dir=tmp_path,
     )
 
@@ -306,21 +326,12 @@ def test_write_constraint_ledger_persists_under_runs_constraints(tmp_path):
 
 
 def test_write_constraint_ledger_blocks_when_payload_would_leak_raw():
-    # Inject a constraint that returns evidence with a forbidden key, and
-    # verify that the resulting ledger entry — built from the report — would
-    # not be allowed past enforce_audit_payload.
-    #
-    # We construct the unsafe entry directly to simulate what
-    # build_ledger_entry would refuse, by adding a forbidden top-level key.
+    # Defense-in-depth: any caller-constructed entry mutated to contain a
+    # raw-indicator field must be rejected by enforce_audit_payload.
     from osint_core.policy import enforce_audit_payload
 
     report = evaluate_constraints(_ctx(requested_modules=("Resource Links",)))
-    safe_entry = build_ledger_entry(
-        report,
-        run_id="run_x",
-        indicator_hash="hash_x",
-        indicator_type="domain",
-    )
+    safe_entry = build_ledger_entry(report, run_id="run_x")
     unsafe_entry = dict(safe_entry)
     unsafe_entry["raw_indicator"] = "example.com"
     with pytest.raises(PolicyViolationException):

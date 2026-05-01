@@ -62,7 +62,6 @@ class ConstraintSeverity(str, Enum):
 
 class ConstraintCode(str, Enum):
     AUTHORIZATION = "authorization"
-    PASSIVITY = "passivity"
     FORBIDDEN_CAPABILITY = "forbidden_capability"
     UNKNOWN_MODULE = "unknown_module"
     AUDIT_PAYLOAD = "audit_payload"
@@ -103,6 +102,7 @@ class ConstraintReport:
     policy_evaluation: PolicyEvaluation
     enforced_correction_verb: CorrectionVerb
     timestamp: str
+    context: ConstraintContext
 
     @property
     def violated(self) -> tuple[ConstraintResult, ...]:
@@ -118,18 +118,8 @@ class ConstraintReport:
         )
 
 
-# Map PolicyErrorCode → ConstraintCode for evidence translation.
-_POLICY_TO_CONSTRAINT_CODE: dict[PolicyErrorCode, ConstraintCode] = {
-    PolicyErrorCode.AUTHORIZATION_REQUIRED: ConstraintCode.AUTHORIZATION,
-    PolicyErrorCode.FORBIDDEN_MODULE: ConstraintCode.FORBIDDEN_CAPABILITY,
-    PolicyErrorCode.UNKNOWN_MODULE: ConstraintCode.UNKNOWN_MODULE,
-    PolicyErrorCode.RAW_LOGGING_BLOCKED: ConstraintCode.AUDIT_PAYLOAD,
-    PolicyErrorCode.INVALID_CORRECTION_VERB: ConstraintCode.CORRECTION_VERB,
-}
-
-
 # Correction-verb priority for derived recommendations.
-# Higher index in this tuple wins when multiple constraints fire.
+# Higher index in _VERB_PRIORITY wins when multiple constraints fire.
 # Order: forbidden/raw-logging escalate to REVERT; authorization-class
 # violations CONSTRAIN; everything else OBSERVE.
 _CONSTRAIN_VERBS: dict[ConstraintCode, CorrectionVerb] = {
@@ -137,7 +127,6 @@ _CONSTRAIN_VERBS: dict[ConstraintCode, CorrectionVerb] = {
     ConstraintCode.AUDIT_PAYLOAD: "REVERT",
     ConstraintCode.CORRECTION_VERB: "REVERT",
     ConstraintCode.AUTHORIZATION: "CONSTRAIN",
-    ConstraintCode.PASSIVITY: "CONSTRAIN",
     ConstraintCode.UNKNOWN_MODULE: "CONSTRAIN",
 }
 
@@ -345,11 +334,14 @@ def evaluate_constraints(
     *,
     constraints: Iterable[Constraint] = DEFAULT_CONSTRAINTS,
     allow_unknown_modules: bool = False,
+    now: datetime | None = None,
 ) -> ConstraintReport:
     """
     Evaluate every registered constraint and return a ``ConstraintReport``.
 
-    The function is pure: it does not mutate ``context`` or any shared state.
+    The function is pure given a supplied ``now``; it does not mutate
+    ``context`` or any shared state. When ``now`` is omitted, the current UTC
+    time is read once. Tests should pass an explicit ``now`` for determinism.
     """
     policy_eval = evaluate_modules(
         list(context.requested_modules),
@@ -373,12 +365,16 @@ def evaluate_constraints(
 
     enforced_verb = _derive_correction_verb(enforced_violations)
 
+    if now is None:
+        now = datetime.now(timezone.utc)
+
     return ConstraintReport(
         decision=decision,
         results=results,
         policy_evaluation=policy_eval,
         enforced_correction_verb=enforced_verb,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=now.isoformat(),
+        context=context,
     )
 
 
@@ -406,25 +402,21 @@ def _derive_correction_verb(
 LEDGER_DIRNAME = "constraints"
 
 
-def build_ledger_entry(
-    report: ConstraintReport,
-    *,
-    run_id: str,
-    indicator_hash: str,
-    indicator_type: str,
-) -> dict:
+def build_ledger_entry(report: ConstraintReport, *, run_id: str) -> dict:
     """
     Produce a JSON-serializable, audit-safe ledger entry from a report.
 
-    Raises ``PolicyViolationException`` if the resulting entry would contain
-    any of the forbidden raw-indicator fields.
+    Indicator hash and type are read from ``report.context`` to guarantee they
+    match the inputs the engine actually evaluated. Raises
+    ``PolicyViolationException`` if the resulting entry would contain any of
+    the forbidden raw-indicator fields.
     """
     entry = {
         "schema_version": LEDGER_SCHEMA_VERSION,
         "run_id": run_id,
         "timestamp": report.timestamp,
-        "indicator_hash": indicator_hash,
-        "indicator_type": indicator_type,
+        "indicator_hash": report.context.indicator_hash,
+        "indicator_type": report.context.indicator_type,
         "decision": report.decision.value,
         "enforced_correction_verb": report.enforced_correction_verb,
         "constraint_results": [
@@ -453,8 +445,6 @@ def write_constraint_ledger(
     report: ConstraintReport,
     *,
     run_id: str,
-    indicator_hash: str,
-    indicator_type: str,
     base_dir: Path,
 ) -> Path:
     """
@@ -463,12 +453,7 @@ def write_constraint_ledger(
     ``base_dir`` is typically the app's ``runs/`` directory. The directory is
     created if it does not exist.
     """
-    entry = build_ledger_entry(
-        report,
-        run_id=run_id,
-        indicator_hash=indicator_hash,
-        indicator_type=indicator_type,
-    )
+    entry = build_ledger_entry(report, run_id=run_id)
     ledger_dir = Path(base_dir) / LEDGER_DIRNAME
     ledger_dir.mkdir(parents=True, exist_ok=True)
     path = ledger_dir / f"{run_id}.json"
