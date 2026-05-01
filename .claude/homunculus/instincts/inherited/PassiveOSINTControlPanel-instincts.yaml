@@ -1,0 +1,368 @@
+# Instincts generated from https://github.com/canstralian/PassiveOSINTControlPanel
+# Generated: 2026-05-01T21:29:38.073Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: PassiveOSINTControlPanel-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/canstralian/PassiveOSINTControlPanel
+---
+
+# PassiveOSINTControlPanel Commit Length
+
+## Action
+
+Write moderate-length commit messages (~53 characters)
+
+## Evidence
+
+- Average commit message length: 53 chars
+- Based on 2 commits
+
+---
+id: PassiveOSINTControlPanel-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/canstralian/PassiveOSINTControlPanel
+---
+
+# PassiveOSINTControlPanel Naming Files
+
+## Action
+
+Use snake_case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: snake_case
+
+---
+id: PassiveOSINTControlPanel-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/canstralian/PassiveOSINTControlPanel
+---
+
+# PassiveOSINTControlPanel Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: PassiveOSINTControlPanel-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/canstralian/PassiveOSINTControlPanel
+---
+
+# PassiveOSINTControlPanel Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: PassiveOSINTControlPanel-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/canstralian/PassiveOSINTControlPanel
+---
+
+# PassiveOSINTControlPanel Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: PassiveOSINTControlPanel-workflow-feature-implementation-with-tests
+trigger: "when doing feature implementation with tests"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/canstralian/PassiveOSINTControlPanel
+---
+
+# PassiveOSINTControlPanel Workflow Feature Implementation With Tests
+
+## Action
+
+Follow the feature-implementation-with-tests workflow:
+1. Implement new logic or module in osint_core (e.g., constraints.py).
+2. Update or create __init__.py to expose new functionality if needed.
+3. Write or update tests in tests/ (e.g., test_constraints.py) to cover new behaviors and pin invariants.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: osint_core/constraints.py, osint_core/__init__.py, tests/test_constraints.py
+
+---
+id: PassiveOSINTControlPanel-workflow-refactor-or-tighten-core-module-and-tests
+trigger: "when doing refactor or tighten core module and tests"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/canstralian/PassiveOSINTControlPanel
+---
+
+# PassiveOSINTControlPanel Workflow Refactor Or Tighten Core Module And Tests
+
+## Action
+
+Follow the refactor-or-tighten-core-module-and-tests workflow:
+1. Refactor or update logic in the core module (e.g., constraints.py).
+2. Update or add tests in tests/ (e.g., test_constraints.py) to pin new behaviors or invariants.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: osint_core/constraints.py, tests/test_constraints.py
+
+---
+id: passiveosintcontrolpanel-instinct-file-naming
+trigger: "When creating or renaming files in the codebase"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct File Naming
+
+## Action
+
+Use snake_case for all file names
+
+## Evidence
+
+- Pattern in namingConventions.files: snake_case
+
+---
+id: passiveosintcontrolpanel-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: passiveosintcontrolpanel-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: passiveosintcontrolpanel-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: passiveosintcontrolpanel-instinct-import-style
+trigger: "When importing modules within the package"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Import Style
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: passiveosintcontrolpanel-instinct-export-style
+trigger: "When exposing functionality from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Export Style
+
+## Action
+
+Use named exports (explicitly list what is exported)
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: passiveosintcontrolpanel-instinct-test-location
+trigger: "When adding or updating tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Test Location
+
+## Action
+
+Place all test files in the separate 'tests' folder
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: separate
+- Files like tests/test_constraints.py
+
+---
+id: passiveosintcontrolpanel-instinct-test-coverage
+trigger: "When implementing or refactoring a core module"
+confidence: 0.95
+domain: testing
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Test Coverage
+
+## Action
+
+Write or update tests to cover new or changed behaviors and pin invariants
+
+## Evidence
+
+- Workflow: feature-implementation-with-tests
+- Workflow: refactor-or-tighten-core-module-and-tests
+- Files: tests/test_constraints.py
+
+---
+id: passiveosintcontrolpanel-instinct-commit-format
+trigger: "When writing a commit message"
+confidence: 0.8
+domain: git
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Commit Format
+
+## Action
+
+Write a concise, imperative summary of the change (no enforced prefix), average length ~53 characters
+
+## Evidence
+
+- Pattern in commits: no prefixes, averageLength: 53
+- Examples: 'Add constraint engine and ledger to osint_core'
+
+---
+id: passiveosintcontrolpanel-instinct-feature-workflow
+trigger: "When adding a new core feature or module and ensuring it is tested"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Feature Workflow
+
+## Action
+
+Implement the feature in osint_core, update __init__.py if needed, and add or update tests in tests/
+
+## Evidence
+
+- Workflow: feature-implementation-with-tests
+- Files: osint_core/constraints.py, osint_core/__init__.py, tests/test_constraints.py
+
+---
+id: passiveosintcontrolpanel-instinct-refactor-workflow
+trigger: "When refactoring or tightening a core module and ensuring tests reflect the changes"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: canstralian/PassiveOSINTControlPanel
+---
+
+# Passiveosintcontrolpanel Instinct Refactor Workflow
+
+## Action
+
+Refactor the core module and update or add tests in tests/ to pin new behaviors or invariants
+
+## Evidence
+
+- Workflow: refactor-or-tighten-core-module-and-tests
+- Files: osint_core/constraints.py, tests/test_constraints.py
+
