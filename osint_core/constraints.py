@@ -27,6 +27,7 @@ Design constraints (the meta-constraints on this module):
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -441,6 +442,20 @@ def build_ledger_entry(report: ConstraintReport, *, run_id: str) -> dict:
     return entry
 
 
+# run_id is interpolated into a filesystem path; restrict to a conservative
+# alphanumeric set so a caller-supplied "../" or absolute path cannot escape
+# the ledger directory.
+_RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _validate_run_id(run_id: str) -> str:
+    if not isinstance(run_id, str) or not _RUN_ID_RE.fullmatch(run_id):
+        raise ValueError(
+            f"Invalid run_id; must match {_RUN_ID_RE.pattern}: {run_id!r}"
+        )
+    return run_id
+
+
 def write_constraint_ledger(
     report: ConstraintReport,
     *,
@@ -451,12 +466,18 @@ def write_constraint_ledger(
     Persist the ledger entry as JSON under ``base_dir/constraints/{run_id}.json``.
 
     ``base_dir`` is typically the app's ``runs/`` directory. The directory is
-    created if it does not exist.
+    created if it does not exist. ``run_id`` is validated against a
+    conservative allowlist before it is interpolated into the file path.
     """
-    entry = build_ledger_entry(report, run_id=run_id)
+    safe_run_id = _validate_run_id(run_id)
+    entry = build_ledger_entry(report, run_id=safe_run_id)
+    # Defense in depth: re-check the entry shape at the sink. ``build_ledger_entry``
+    # already enforces audit-payload safety, but a caller (or a test) may
+    # substitute a custom builder, so the sink does not trust its inputs.
+    enforce_audit_payload(entry)
     ledger_dir = Path(base_dir) / LEDGER_DIRNAME
     ledger_dir.mkdir(parents=True, exist_ok=True)
-    path = ledger_dir / f"{run_id}.json"
+    path = ledger_dir / f"{safe_run_id}.json"
     path.write_text(json.dumps(entry, indent=2, sort_keys=True), encoding="utf-8")
     return path
 

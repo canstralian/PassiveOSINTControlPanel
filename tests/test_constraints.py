@@ -325,6 +325,31 @@ def test_write_constraint_ledger_persists_under_runs_constraints(tmp_path):
     assert "raw_indicator" not in on_disk
 
 
+def test_write_constraint_ledger_rejects_path_traversal_run_id(tmp_path):
+    report = evaluate_constraints(_ctx(requested_modules=("Resource Links",)))
+    for evil in ["../escape", "/abs/path", "run/with/slash", "..", "a;b", "" ]:
+        with pytest.raises(ValueError):
+            write_constraint_ledger(report, run_id=evil, base_dir=tmp_path)
+
+
+def test_write_constraint_ledger_rejects_poisoned_entry_at_sink(tmp_path, monkeypatch):
+    # If a caller substitutes build_ledger_entry with one that bypasses
+    # enforce_audit_payload, the sink itself must still refuse to write a
+    # raw-indicator-shaped entry.
+    report = evaluate_constraints(_ctx(requested_modules=("Resource Links",)))
+
+    def poisoned(_report, *, run_id):
+        return {"run_id": run_id, "raw_indicator": "example.com"}
+
+    monkeypatch.setattr(
+        "osint_core.constraints.build_ledger_entry", poisoned
+    )
+    with pytest.raises(PolicyViolationException):
+        write_constraint_ledger(report, run_id="run_poison", base_dir=tmp_path)
+    # And nothing should have been written.
+    assert not (tmp_path / "constraints" / "run_poison.json").exists()
+
+
 def test_write_constraint_ledger_blocks_when_payload_would_leak_raw():
     # Defense-in-depth: any caller-constructed entry mutated to contain a
     # raw-indicator field must be rejected by enforce_audit_payload.
