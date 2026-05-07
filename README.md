@@ -32,7 +32,9 @@ The Passive OSINT Control Panel is a controlled, security-first environment for 
 
 The system is structured as a layered pipeline:
 
-text Input → Validation → Sanitisation → Normalisation → Hashing → Passive Enrichment → Caching → Reporting → Audit Logging 
+```text
+Input → Validation → Sanitisation → Normalisation → Hashing → Passive Enrichment → Caching → Reporting → Audit Logging
+```
 
 This architecture ensures that all inputs are treated as untrusted, all outputs are controlled, and all actions are traceable.
 
@@ -84,7 +86,40 @@ Modules are isolated and constrained by scope, rate limits, and timeouts.
 
 ## System Architecture
 
-text                 ┌────────────────────┐                 │       UI Layer     │                 │ (Gradio / Streamlit)                 └─────────┬──────────┘                           │                 ┌─────────▼──────────┐                 │ Input Validation    │                 │ & Sanitisation      │                 └─────────┬──────────┘                           │                 ┌─────────▼──────────┐                 │ Normalisation       │                 │ (domain/user/email) │                 └─────────┬──────────┘                           │                 ┌─────────▼──────────┐                 │ Hashing Layer       │                 │ (HMAC + Salt)       │                 └─────────┬──────────┘                           │                 ┌─────────▼──────────┐                 │ Enrichment Engine   │                 │ (Passive Modules)   │                 └─────────┬──────────┘                           │                 ┌─────────▼──────────┐                 │ Reporting Engine    │                 └─────────┬──────────┘                           │                 ┌─────────▼──────────┐                 │ Audit Log + Cache   │                 └────────────────────┘ 
+```text
+┌────────────────────┐
+│       UI Layer     │
+│      (Gradio)      │
+└─────────┬──────────┘
+          │
+┌─────────▼──────────┐
+│ Input Validation   │
+│ & Sanitisation     │
+└─────────┬──────────┘
+          │
+┌─────────▼──────────┐
+│ Normalisation      │
+│ (domain/user/email)│
+└─────────┬──────────┘
+          │
+┌─────────▼──────────┐
+│ Hashing Layer      │
+│ (HMAC + Salt)      │
+└─────────┬──────────┘
+          │
+┌─────────▼──────────┐
+│ Enrichment Engine  │
+│ (Passive Modules)  │
+└─────────┬──────────┘
+          │
+┌─────────▼──────────┐
+│ Reporting Engine   │
+└─────────┬──────────┘
+          │
+┌─────────▼──────────┐
+│ Audit Log + Cache  │
+└────────────────────┘
+```
 
 ---
 
@@ -103,8 +138,9 @@ text                 ┌──────────────────�
 - No storage of raw indicators unless required
 
 ### Secrets Management
-- All secrets stored via Hugging Face Space Secrets
-- No credentials committed to repository
+- Runtime secrets are stored as Hugging Face Space Secrets.
+- Deployment secrets are stored as GitHub Actions repository secrets.
+- No credentials are committed to the repository.
 
 ### Execution Guardrails
 - Rate limiting per request
@@ -118,17 +154,51 @@ text                 ┌──────────────────�
 
 Modules are categorized by risk level:
 
-text LOW RISK (Passive Only) - DNS - WHOIS - Certificate transparency - Link generation  CONDITIONAL (Requires Authorization) - HTTP headers - robots.txt retrieval - webpage screenshotting 
+```text
+LOW RISK (Passive Only)
+- DNS
+- WHOIS
+- Certificate transparency
+- Link generation
+
+CONDITIONAL (Requires Authorization)
+- HTTP headers
+- robots.txt retrieval
+- webpage screenshotting
+```
 
 Authorization flow:
 
-text User Input → Validation → Authorization Checkbox → Risk Disclosure → Module Execution (if approved) → Logged Outcome 
+```text
+User Input → Validation → Authorization Checkbox → Risk Disclosure → Module Execution (if approved) → Logged Outcome
+```
 
 ---
 
 ## Repository Structure
 
-text . ├── app.py ├── requirements.txt ├── README.md ├── Dockerfile ├── data/ │   └── sources.yaml ├── osint_core/ │   ├── validators.py │   ├── sanitize.py │   ├── hashing.py │   ├── enrichment.py │   ├── reports.py │   ├── audit.py │   └── policy.py ├── tests/ │   ├── test_validators.py │   ├── test_sanitize.py │   ├── test_hashing.py │   └── test_enrichment.py 
+```text
+.
+├── app.py
+├── requirements.txt
+├── README.md
+├── Dockerfile
+├── data/
+│   └── sources.yaml
+├── osint_core/
+│   ├── validators.py
+│   ├── sanitize.py
+│   ├── hashing.py
+│   ├── enrichment.py
+│   ├── reports.py
+│   ├── audit.py
+│   └── policy.py
+└── tests/
+    ├── test_validators.py
+    ├── test_sanitize.py
+    ├── test_hashing.py
+    └── test_enrichment.py
+```
 
 ---
 
@@ -136,16 +206,60 @@ text . ├── app.py ├── requirements.txt ├── README.md ├──
 
 ### Local Development
 
-bash git clone <repo> cd osint-control-panel pip install -r requirements.txt export OSINT_HASH_SALT="your-secure-random-salt" python app.py 
+```bash
+git clone https://github.com/canstralian/PassiveOSINTControlPanel.git
+cd PassiveOSINTControlPanel
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export OSINT_HASH_SALT="your-secure-random-salt"
+python app.py
+```
 
 ### Hugging Face Space Deployment
 
-1. Create a new Space (Gradio SDK recommended)
-2. Push repository
-3. Configure Secrets:
-   - OSINT_HASH_SALT
-   - Any API tokens (optional)
-4. Select hardware tier (CPU sufficient for passive mode)
+This repository is configured as a Gradio Space through the README frontmatter:
+
+```yaml
+sdk: gradio
+sdk_version: 6.13.0
+app_file: app.py
+```
+
+The GitHub workflow `.github/workflows/sync-huggingface.yml` deploys GitHub `main` to Hugging Face after the `CI` workflow succeeds on `main`. Manual dispatch is also available from the Actions tab.
+
+Required GitHub repository secrets:
+
+```text
+HF_TOKEN       # Hugging Face token with write access to the Space
+HF_USERNAME    # Hugging Face user or organization that owns the Space
+```
+
+Optional GitHub repository secret:
+
+```text
+HF_SPACE_NAME  # Space repo name; defaults to this GitHub repository name
+```
+
+Required Hugging Face Space secret:
+
+```text
+OSINT_HASH_SALT
+```
+
+Optional reverse-sync GitHub repository secret:
+
+```text
+GH_PAT         # Required only for manual huggingface-to-github sync
+```
+
+Deployment flow:
+
+```text
+Merge to main → CI passes → sync-huggingface.yml pushes HEAD to Hugging Face Space → Space rebuilds
+```
+
+CPU hardware is sufficient for the passive default mode.
 
 ---
 
@@ -153,7 +267,13 @@ bash git clone <repo> cd osint-control-panel pip install -r requirements.txt exp
 
 ### Test Stack
 
-bash pytest bandit -r osint_core/ ruff check . pip-audit 
+```bash
+pytest
+bandit -r osint_core/
+ruff check .
+ruff format --check .
+pip-audit -r requirements.txt
+```
 
 ### Coverage Areas
 - Input validation rejection cases
@@ -168,7 +288,18 @@ bash pytest bandit -r osint_core/ ruff check . pip-audit
 
 Each run produces a structured record:
 
-json {   "timestamp": "ISO8601",   "run_id": "unique_case_id",   "input_type": "domain|username|email",   "indicator_hash": "HMAC_SHA256",   "modules": ["dns", "whois"],   "mode": "passive|authorized",   "authorized_target": false,   "duration_ms": 320 } 
+```json
+{
+  "timestamp": "ISO8601",
+  "run_id": "unique_case_id",
+  "input_type": "domain|username|email",
+  "indicator_hash": "HMAC_SHA256",
+  "modules": ["dns", "whois"],
+  "mode": "passive|authorized",
+  "authorized_target": false,
+  "duration_ms": 320
+}
+```
 
 Logs are designed for:
 - Reproducibility
@@ -234,12 +365,18 @@ Users are responsible for:
 
 ## Roadmap
 
-text v1.0 - Passive control panel - Core enrichment modules - Hashing + audit system  v1.1 - Graph visualization - Case persistence  v2.0 - Docker modules - Authorization workflow - Advanced reporting  v2.1 - API interface - MCP integration 
+```text
+v1.0 - Passive control panel - Core enrichment modules - Hashing + audit system
+v1.1 - Graph visualization - Case persistence
+v2.0 - Docker modules - Authorization workflow - Advanced reporting
+v2.1 - API interface - MCP integration
+```
 
 ---
 
 ## License
-Specify appropriate license (e.g., MIT, Apache 2.0)
+
+Apache License 2.0. See [LICENSE](LICENSE) for details.
 
 ---
 
