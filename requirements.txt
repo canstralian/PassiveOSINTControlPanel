@@ -14,7 +14,7 @@
 
 # UI
 
-gradio>=4.44.0
+gradio>=4.44.1
 
 # HTTP / networking
 
