@@ -35,7 +35,7 @@ pydantic<=2.13.4,>=2.13.4
 
 pyyaml>=6.0.3,<7
 cachetools>=7.0.6,<8
-markdown-it-py>=4.0.0,<5
+markdown-it-py>=4.2.0,<5
 
 # AI
 
