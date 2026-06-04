@@ -38,6 +38,16 @@ from .constraints import evaluate_constraints, propose_actions, passive_module_a
 from .invention import run_invention_loop, summarize_invention_response
 from .ledger import write_constraint_ledger, summarize_constraint_events
 from .reports import render_constraint_report
+from .sources import (
+    Source,
+    SourceErrorCode,
+    SourceRegistry,
+    SourceRegistryError,
+    build_links,
+    get_default_registry,
+    load_sources,
+    reload_default_registry,
+)
 
 __all__ = [
     # validation
@@ -61,6 +71,15 @@ __all__ = [
     "write_constraint_ledger",
     "summarize_constraint_events",
     "render_constraint_report",
+    # source registry loader
+    "Source",
+    "SourceErrorCode",
+    "SourceRegistry",
+    "SourceRegistryError",
+    "build_links",
+    "get_default_registry",
+    "load_sources",
+    "reload_default_registry",
 ]
 
 __version__ = "0.1.0"

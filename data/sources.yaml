@@ -10,3 +10,4 @@ domain:
 username:
   - name: Namechk
     url: "https://namechk.com/{query}"
+    risk: low
