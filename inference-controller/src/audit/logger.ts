@@ -67,6 +67,7 @@ export type AuditPayload = Omit<AuditEvent, "id" | "timestamp" | "integrityMarke
 export class AuditLogger {
   private _failClosed = false;
   private _lastIntegrityMarker = "GENESIS";
+  private _initialized: Promise<void> | undefined;
 
   constructor(private readonly sink: AuditSink) {}
 
@@ -75,10 +76,33 @@ export class AuditLogger {
   }
 
   /**
+   * Lazily rehydrate the last integrity marker from the sink. Without this,
+   * a fresh AuditLogger over a non-empty sink would fork the hash chain.
+   * A failure to read is treated as a fail-closed event because we cannot
+   * extend the chain safely.
+   */
+  private async initialize(): Promise<void> {
+    if (!this._initialized) {
+      this._initialized = (async () => {
+        try {
+          const events = await this.sink.read();
+          const last = events.length > 0 ? events[events.length - 1] : undefined;
+          if (last) this._lastIntegrityMarker = last.integrityMarker;
+        } catch (err) {
+          this._failClosed = true;
+          throw err;
+        }
+      })();
+    }
+    await this._initialized;
+  }
+
+  /**
    * Write an audit event. Returns the persisted event. Throws and enters
    * fail-closed mode if the sink rejects the write.
    */
   async record(payload: AuditPayload, now: Date = new Date()): Promise<AuditEvent> {
+    await this.initialize();
     if (this._failClosed) {
       throw new Error("AuditLogger is in fail-closed mode");
     }

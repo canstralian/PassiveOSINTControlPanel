@@ -27,7 +27,9 @@ export class ResultValidator {
     if (!schema) {
       return {
         ok: false,
-        errorCode: "result_invalid",
+        // Distinct from result_invalid: this is a configuration gap, not a
+        // tool that produced an unexpected payload.
+        errorCode: "schema_invalid",
         message: `no schema registered for tool ${envelope.toolId}`,
       };
     }

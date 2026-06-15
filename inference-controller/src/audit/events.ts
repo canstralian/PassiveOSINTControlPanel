@@ -11,11 +11,12 @@ export class EventLogger {
   private readonly events: DomainEvent[] = [];
 
   emit(event: DomainEvent): void {
-    this.events.push(event);
+    // Defensive copy: callers must not be able to mutate stored events.
+    this.events.push(structuredClone(event));
   }
 
   all(): readonly DomainEvent[] {
-    return this.events;
+    return this.events.slice();
   }
 
   byInvestigation(investigationId: string): readonly DomainEvent[] {

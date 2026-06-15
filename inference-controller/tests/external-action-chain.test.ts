@@ -131,7 +131,7 @@ describe("external-action control chain", () => {
       targets: [{ kind: "external_target", refId: "target.example" }],
       estimatedRiskClass: "high",
     });
-    deps.approvalGate.preApprove(action.id, "operator");
+    deps.approvalGate.preApprove(inv.id, action.id, "operator");
     const out = await runExternalAction(deps, {
       investigation: inv,
       action,

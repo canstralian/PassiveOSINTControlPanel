@@ -10,10 +10,11 @@
 import type {
   CandidateAction,
   Investigation,
+  ValidationFailure,
   ValidationResult,
 } from "../domain/types.js";
 import type { ScopePolicy } from "../safety/scope.js";
-import { scopeDecisionToValidation } from "../safety/scope.js";
+import { scopeDenialToValidation } from "../safety/scope.js";
 import type { RiskClassifier } from "../safety/risk.js";
 import type { ApprovalGate } from "../safety/approval.js";
 import type { AuditLogger } from "../audit/logger.js";
@@ -38,7 +39,7 @@ export type ExternalActionOutcome =
         | "tool"
         | "result_validation"
         | "input";
-      validation: ValidationResult;
+      validation: ValidationFailure;
       failClosed: boolean;
     };
 
@@ -106,7 +107,7 @@ export async function runExternalAction(
       ok: false,
       stage: "scope",
       failClosed: false,
-      validation: scopeDecisionToValidation(scopeDec),
+      validation: scopeDenialToValidation(scopeDec),
     };
   }
 
@@ -189,15 +190,31 @@ export async function runExternalAction(
     };
   }
 
-  // 5. Tool gateway.
-  const envelope = await deps.toolGateway.invoke({
-    toolId: action.toolRef.toolId,
-    input: action.toolRef.input,
-    context: {
-      investigationId: investigation.id,
-      actionId: action.id,
-    },
-  });
+  // 5. Tool gateway. The gateway already normalizes thrown errors into a
+  // failure envelope, but we add a defensive try/catch so an unexpected
+  // exception cannot escape the chain.
+  let envelope: ToolResultEnvelope;
+  try {
+    envelope = await deps.toolGateway.invoke({
+      toolId: action.toolRef.toolId,
+      input: action.toolRef.input,
+      context: {
+        investigationId: investigation.id,
+        actionId: action.id,
+      },
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      stage: "tool",
+      failClosed: false,
+      validation: {
+        ok: false,
+        errorCode: "tool_failure",
+        message: err instanceof Error ? err.message : "tool invocation failed",
+      },
+    };
+  }
 
   // 6. Result validation.
   const validation = deps.resultValidator.validate(envelope);

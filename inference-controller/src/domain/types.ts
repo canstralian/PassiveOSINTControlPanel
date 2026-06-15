@@ -306,53 +306,86 @@ export const ScoreDecomposition = z.object({
 });
 export type ScoreDecomposition = z.infer<typeof ScoreDecomposition>;
 
-export const ActionDecision = z.object({
-  id: z.string().min(1),
-  investigationId: z.string().min(1),
-  selectedActionId: z.string().min(1),
-  // Persisted score decomposition for the selected action.
-  score: ScoreDecomposition,
-  // Score decompositions for all admissible candidates considered.
-  candidateScores: z.array(
-    z.object({
-      candidateId: z.string().min(1),
-      score: ScoreDecomposition,
-    })
-  ),
-  // If a non-top action was chosen, this MUST be present.
-  overrideReason: z.string().optional(),
-  // Mode at the time of decision.
-  mode: z.enum(["exploration", "triage", "exploitation", "recovery", "stop_review"]),
-  decidedAt: z.string().datetime(),
-});
+export const ActionDecision = z
+  .object({
+    id: z.string().min(1),
+    investigationId: z.string().min(1),
+    selectedActionId: z.string().min(1),
+    // Persisted score decomposition for the selected action.
+    score: ScoreDecomposition,
+    // Score decompositions for all admissible candidates considered.
+    candidateScores: z.array(
+      z.object({
+        candidateId: z.string().min(1),
+        score: ScoreDecomposition,
+      })
+    ),
+    // If a non-top action was chosen, this MUST be present and non-blank.
+    overrideReason: z.string().optional(),
+    // Mode at the time of decision.
+    mode: z.enum(["exploration", "triage", "exploitation", "recovery", "stop_review"]),
+    decidedAt: z.string().datetime(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.candidateScores.length === 0) return;
+    // Compute the top by finalScore, tiebroken by candidateId for parity
+    // with Controller's ordering.
+    const topCandidate = val.candidateScores
+      .slice()
+      .sort((a, b) => {
+        if (b.score.finalScore !== a.score.finalScore) {
+          return b.score.finalScore - a.score.finalScore;
+        }
+        return a.candidateId.localeCompare(b.candidateId);
+      })[0]!;
+    const isOverride = val.selectedActionId !== topCandidate.candidateId;
+    if (isOverride && !val.overrideReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["overrideReason"],
+        message:
+          "overrideReason is required and must be non-empty when selectedActionId is not the top-scoring candidate",
+      });
+    }
+  });
 export type ActionDecision = z.infer<typeof ActionDecision>;
 
 // ---------------------------------------------------------------------------
 // Validation results (returned by validators / ResultValidator)
 // ---------------------------------------------------------------------------
 
-export const ValidationResult = z.object({
-  ok: z.boolean(),
-  // Closed enum of error codes for machine-checkable failure cases.
-  errorCode: z
-    .enum([
-      "schema_invalid",
-      "scope_denied",
-      "risk_threshold_exceeded",
-      "approval_missing",
-      "audit_unavailable",
-      "tool_failure",
-      "result_invalid",
-      "lifecycle_invalid_transition",
-      "provenance_missing",
-      "merge_unauthorized",
-      "budget_exceeded",
-    ])
-    .optional(),
-  message: z.string().optional(),
-  details: z.record(z.unknown()).optional(),
-});
+export const ValidationErrorCode = z.enum([
+  "schema_invalid",
+  "scope_denied",
+  "risk_threshold_exceeded",
+  "approval_missing",
+  "audit_unavailable",
+  "tool_failure",
+  "result_invalid",
+  "lifecycle_invalid_transition",
+  "provenance_missing",
+  "merge_unauthorized",
+  "budget_exceeded",
+]);
+export type ValidationErrorCode = z.infer<typeof ValidationErrorCode>;
+
+// Discriminated union on `ok` so contradictory states (ok: true with
+// errorCode, ok: false without errorCode) cannot be constructed.
+export const ValidationResult = z.discriminatedUnion("ok", [
+  z.object({
+    ok: z.literal(true),
+    details: z.record(z.unknown()).optional(),
+  }),
+  z.object({
+    ok: z.literal(false),
+    errorCode: ValidationErrorCode,
+    message: z.string().min(1),
+    details: z.record(z.unknown()).optional(),
+  }),
+]);
 export type ValidationResult = z.infer<typeof ValidationResult>;
+export type ValidationFailure = Extract<ValidationResult, { ok: false }>;
+export type ValidationSuccess = Extract<ValidationResult, { ok: true }>;
 
 // ---------------------------------------------------------------------------
 // Audit events

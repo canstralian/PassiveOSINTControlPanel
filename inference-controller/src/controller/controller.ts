@@ -87,6 +87,11 @@ export class Controller {
     let selected: { candidate: CandidateAction; score: ScoreDecomposition };
     let overrideReason: string | undefined;
     if (input.override) {
+      if (input.override.reason.trim().length === 0) {
+        throw new ControllerConfigurationError(
+          "override reason must be a non-empty string"
+        );
+      }
       const found = scored.find((s) => s.candidate.id === input.override!.actionId);
       if (!found) {
         throw new ControllerOverrideError(input.override.actionId);
@@ -97,10 +102,17 @@ export class Controller {
       selected = top;
     }
 
+    // Stop metrics must reflect *executable* actions only — the synthetic
+    // stop_and_report candidate should not inflate the count or supply the
+    // top score.
+    const executable = scored.filter((s) => s.candidate.id !== stopCandidate.id);
+    const topExecutable = executable[0];
     const stopSignal = evaluateStop({
       budgets: input.investigation.budgets,
-      admissibleActionCount: admissible.length - 1, // exclude stop itself
-      topActionScore: top.score.finalScore,
+      admissibleActionCount: executable.length,
+      topActionScore: topExecutable
+        ? topExecutable.score.finalScore
+        : Number.NEGATIVE_INFINITY,
       scoreThreshold: input.scoreThreshold ?? 0,
       hasValidatedTopHypothesis: input.hasValidatedTopHypothesis ?? false,
       hasFalsifiedAllActive: input.hasFalsifiedAllActive ?? false,

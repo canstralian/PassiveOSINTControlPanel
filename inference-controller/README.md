@@ -10,7 +10,7 @@ MVP scaffolding. Mock tool gateway only. No real external adapters.
 
 ## Layout
 
-```
+```text
 src/
   domain/      Zod schemas, lifecycle state machine, IDs
   safety/      ScopePolicy, RiskClassifier, ApprovalGate
@@ -25,7 +25,7 @@ tests/         Vitest suite covering required test categories
 
 ## Run
 
-```
+```bash
 npm install
 npm run typecheck
 npm test

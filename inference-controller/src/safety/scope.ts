@@ -8,6 +8,7 @@
 import type {
   CandidateAction,
   InvestigationScope,
+  ValidationFailure,
   ValidationResult,
 } from "../domain/types.js";
 
@@ -70,9 +71,15 @@ export class ScopePolicy {
 
 export function scopeDecisionToValidation(d: ScopeDecision): ValidationResult {
   if (d.allowed) return { ok: true };
+  return scopeDenialToValidation(d);
+}
+
+export function scopeDenialToValidation(
+  d: Extract<ScopeDecision, { allowed: false }>
+): ValidationFailure {
   return {
     ok: false,
     errorCode: "scope_denied",
-    message: d.reasons.join("; "),
+    message: d.reasons.join("; ") || "scope denied",
   };
 }
