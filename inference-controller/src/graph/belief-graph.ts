@@ -196,6 +196,12 @@ export class BeliefGraph {
         // Merge identifiers are external to the graph store. Edges to merges
         // are validated against a separate merge service if used.
         return true;
+      default: {
+        // Compile-time exhaustiveness check: if a new fromKind is added to
+        // GraphEdge, TypeScript will refuse to compile this assignment.
+        const _exhaustive: never = kind;
+        throw new Error(`unhandled node kind: ${String(_exhaustive)}`);
+      }
     }
   }
 

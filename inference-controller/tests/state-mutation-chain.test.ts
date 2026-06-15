@@ -138,6 +138,36 @@ describe("state-mutation chain", () => {
     expect(serviceCalled).toBe(false);
   });
 
+  it("fails closed when output validation fails after the service ran", async () => {
+    const auditLogger = new AuditLogger(new InMemoryAuditSink());
+    const eventLogger = new EventLogger();
+    let serviceCalled = false;
+    const out = await runStateMutation(
+      { auditLogger, eventLogger },
+      {
+        actor: "tester",
+        investigationId: "inv_1",
+        operation: "hypothesis_created",
+        inputSchema: z.object({}),
+        input: {},
+        scopeCheck: allowAll,
+        service: async () => {
+          serviceCalled = true;
+          return { wrong_shape: true };
+        },
+        outputSchema: z.object({ count: z.number() }),
+      }
+    );
+    expect(serviceCalled).toBe(true);
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.stage).toBe("output_validation");
+      // Service mutated state but the result is unverifiable — caller
+      // must treat the system as potentially inconsistent.
+      expect(out.failClosed).toBe(true);
+    }
+  });
+
   it("returns the validated/coerced output, not the raw service output", async () => {
     const auditLogger = new AuditLogger(new InMemoryAuditSink());
     const eventLogger = new EventLogger();

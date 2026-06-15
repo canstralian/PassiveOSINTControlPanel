@@ -130,12 +130,17 @@ export async function runStateMutation<I, O>(
   }
 
   // 5. Output validation.
+  // If this fails, the domain service has ALREADY mutated state, but we
+  // cannot describe the result. Per spec point 4 ("transactional where
+  // possible") we have no rollback, so the system is potentially
+  // inconsistent — fail closed so callers treat this as a critical
+  // incident, not a routine error.
   const outParsed = req.outputSchema.safeParse(output);
   if (!outParsed.success) {
     return {
       ok: false,
       stage: "output_validation",
-      failClosed: false,
+      failClosed: true,
       validation: {
         ok: false,
         errorCode: "result_invalid",

@@ -49,6 +49,29 @@ import {
   newObservationModelId,
 } from "../src/domain/ids.js";
 
+describe("audit logger serializes concurrent records", () => {
+  it("concurrent record() calls produce a valid hash chain", async () => {
+    const sink = new InMemoryAuditSink();
+    const logger = new AuditLogger(sink);
+    // Fire many records concurrently.
+    await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        logger.record({
+          actor: "tester",
+          investigationId: "inv_1",
+          operation: "hypothesis_created",
+          inputRefs: [`hyp_${i}`],
+          scopeDecision: "n/a",
+          riskDecision: "n/a",
+        })
+      )
+    );
+    const events = await logger.readAll();
+    expect(events).toHaveLength(20);
+    expect(verifyAuditChain(events).ok).toBe(true);
+  });
+});
+
 describe("audit logger rehydrates from sink", () => {
   it("a fresh logger reading a pre-populated sink extends the existing chain", async () => {
     const sink = new InMemoryAuditSink();
