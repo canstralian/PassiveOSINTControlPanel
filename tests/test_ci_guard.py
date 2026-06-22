@@ -220,10 +220,20 @@ def test_passive_first_ignores_non_requests_calls(fake_repo: Path) -> None:
     assert findings == []
 
 
-def test_passive_first_skips_pseudocode_allowlist(fake_repo: Path) -> None:
-    # drift.py is documented pseudocode; the rule must not blow up on it.
-    (fake_repo / "osint_core" / "drift.py").write_text(
+def test_passive_first_skips_pseudocode_allowlist(
+    fake_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Files listed in PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST are exempt from
+    # the syntax-error sub-check. Use a synthetic name so the test does
+    # not depend on which real file happens to be pseudocode today.
+    (fake_repo / "osint_core" / "_legacy_spec.py").write_text(
         "DEFINE foo AS bar\nFUNCTION baz()\n",
+    )
+    monkeypatch.setattr(
+        ci_guard,
+        "PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST",
+        ("osint_core/_legacy_spec.py",),
     )
     findings = ci_guard.check_passive_first(fake_repo)
     assert findings == []
