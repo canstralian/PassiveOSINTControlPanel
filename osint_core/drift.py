@@ -165,6 +165,8 @@ def assess_drift(
     top-down (policy first, statistical last), but the recommendation logic
     is driven by the aggregated vector, not by signal order.
     """
+    baseline = baseline if isinstance(baseline, dict) else {}
+    policy_result = policy_result if isinstance(policy_result, dict) else {}
     signals: list[DriftSignal] = []
     signals.extend(_check_policy_drift(policy_result))
     signals.extend(_check_structural_drift(telemetry, baseline))
