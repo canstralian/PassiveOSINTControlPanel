@@ -262,11 +262,13 @@ def estimate_confidence(signals: list[DriftSignal]) -> float:
 
 
 def _check_policy_drift(policy_result: dict[str, Any]) -> list[DriftSignal]:
-    violations = policy_result.get("violations") or []
-    if not violations:
+    violations = policy_result.get("violations") if isinstance(policy_result, dict) else None
+    if not isinstance(violations, list):
         return []
     signals: list[DriftSignal] = []
     for violation in violations:
+        if not isinstance(violation, dict):
+            continue
         code = str(violation.get("code", "unknown"))
         message = str(violation.get("message", "Policy violation."))
         module = violation.get("module")
