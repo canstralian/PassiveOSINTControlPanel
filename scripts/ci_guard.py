@@ -279,17 +279,19 @@ FORBIDDEN_TOOL_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Files that mention forbidden tool names for legitimate policy reasons:
-# alias tables that map "nmap" -> "port_scan", forbidden-set membership
-# tests, and the guard implementation itself. Each entry must justify why
-# the literal appears in a passive-first repo.
+# Files and directories that mention forbidden tool names for legitimate
+# policy reasons: alias tables, forbidden-set declarations, and the tests
+# that verify policy enforcement. ``tests/`` is allowlisted wholesale
+# because tests are by definition where these names must appear to assert
+# the policy blocks them. ``policy/`` is allowlisted because its YAML
+# files declare the forbidden-module lists. Directory-shaped entries end
+# with ``/``; file-shaped entries are exact-match.
 FORBIDDEN_TOOLS_PATH_ALLOWLIST: tuple[str, ...] = (
     "osint_core/policy.py",      # ALIASES maps offensive tool names to canonical modules.
     "osint_core/intent.py",      # forbidden-set classification references the same names.
-    "tests/test_policy.py",      # asserts ALIASES["nmap"] -> "port_scan".
-    "tests/test_intent.py",      # asserts requesting "nmap" yields critical risk.
-    "tests/test_ci_guard.py",    # exercises this rule with synthetic samples.
     "scripts/ci_guard.py",       # this file declares the forbidden list.
+    "tests/",                    # tests verify the policy blocks these modules.
+    "policy/",                   # declarative policy YAML lists forbidden modules.
 )
 
 
@@ -369,12 +371,10 @@ AUTHORIZED_HINTS: frozenset[str] = frozenset(
 PASSIVE_FIRST_SCOPE: tuple[str, ...] = ("osint_core/",)
 
 # Files in PASSIVE_FIRST_SCOPE that intentionally fail Python parsing.
-# osint_core/drift.py is documented pseudocode (see CLAUDE.md). Adding an
-# entry here means "this file is exempt from the syntax-error sub-check";
-# it does NOT exempt the file from the unauthorized-call sub-check.
-PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST: tuple[str, ...] = (
-    "osint_core/drift.py",
-)
+# Adding an entry here means "this file is exempt from the syntax-error
+# sub-check"; it does NOT exempt the file from the unauthorized-call
+# sub-check. Empty until a file legitimately ships as pseudocode again.
+PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST: tuple[str, ...] = ()
 
 
 def is_requests_call(node: ast.Call) -> bool:
