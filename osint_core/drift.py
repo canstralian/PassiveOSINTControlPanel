@@ -352,7 +352,9 @@ def _check_behavioral_drift(
 ) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
 
-    known: dict[str, str] = baseline.get("known_output_hashes") or {}
+    known = baseline.get("known_output_hashes")
+    if not isinstance(known, dict):
+        known = {}
     expected_output = known.get(telemetry.indicator_hash)
     if expected_output is not None and telemetry.output_hash != expected_output:
         signals.append(
