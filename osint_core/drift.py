@@ -505,7 +505,9 @@ def _check_statistical_drift(
             )
         )
 
-    module_dist: dict[str, float] = baseline.get("module_usage_distribution") or {}
+    module_dist = baseline.get("module_usage_distribution")
+    if not isinstance(module_dist, dict):
+        module_dist = {}
     if module_dist:
         unseen = [m for m in telemetry.modules_executed if m not in module_dist]
         if unseen:
