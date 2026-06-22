@@ -482,7 +482,9 @@ def _check_statistical_drift(
 ) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
 
-    input_dist: dict[str, float] = baseline.get("input_type_distribution") or {}
+    input_dist = baseline.get("input_type_distribution")
+    if not isinstance(input_dist, dict):
+        input_dist = {}
     if input_dist and telemetry.indicator_type not in input_dist:
         # Score 0.5 so an entirely new indicator type clears the ADAPT
         # threshold without further evidence.
