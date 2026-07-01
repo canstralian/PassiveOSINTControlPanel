@@ -283,13 +283,28 @@ FORBIDDEN_TOOL_PATTERN = re.compile(
 # alias tables that map "nmap" -> "port_scan", forbidden-set membership
 # tests, and the guard implementation itself. Each entry must justify why
 # the literal appears in a passive-first repo.
+#
+# This is an explicit, per-file enumeration on purpose. A broad "tests/"
+# directory sweep would exempt every current and future test file from the
+# rule, so a test that genuinely introduced offensive tooling would pass
+# silently. Every test below feeds a forbidden tool name in as *input* to
+# assert the passive-first gate rejects or remaps it; each new such test must
+# be added here deliberately.
 FORBIDDEN_TOOLS_PATH_ALLOWLIST: tuple[str, ...] = (
-    "osint_core/policy.py",      # ALIASES maps offensive tool names to canonical modules.
-    "osint_core/intent.py",      # forbidden-set classification references the same names.
-    "tests/test_policy.py",      # asserts ALIASES["nmap"] -> "port_scan".
-    "tests/test_intent.py",      # asserts requesting "nmap" yields critical risk.
-    "tests/test_ci_guard.py",    # exercises this rule with synthetic samples.
-    "scripts/ci_guard.py",       # this file declares the forbidden list.
+    "osint_core/policy.py",              # ALIASES maps offensive tool names to canonical modules.
+    "osint_core/intent.py",              # forbidden-set classification references the same names.
+    "policy/passive_scope_rules.yaml",   # declares nmap/masscan in the forbidden deny list.
+    "scripts/ci_guard.py",               # this file declares the forbidden list.
+    "tests/test_policy.py",              # asserts ALIASES["nmap"] -> "port_scan".
+    "tests/test_intent.py",              # asserts requesting "nmap" yields critical risk.
+    "tests/test_ci_guard.py",            # exercises this rule with synthetic samples.
+    "tests/test_adaptation.py",          # feeds "nmap" as a blocked module to test adaptation.
+    "tests/test_audit.py",               # feeds "nmap" as a blocked module to test audit output.
+    "tests/test_constraint_ledger.py",   # feeds "nmap" as a blocked module to test the ledger.
+    "tests/test_constraints.py",         # feeds "nmap" as a blocked module to test constraints.
+    "tests/test_enrichment.py",          # asserts "nmap" remaps to port_scan in planning.
+    "tests/test_invention_loop.py",      # feeds "nmap" as a blocked module to the invention loop.
+    "tests/test_passive_boundaries.py",  # asserts nmap/masscan/exploit stay forbidden.
 )
 
 
@@ -369,12 +384,13 @@ AUTHORIZED_HINTS: frozenset[str] = frozenset(
 PASSIVE_FIRST_SCOPE: tuple[str, ...] = ("osint_core/",)
 
 # Files in PASSIVE_FIRST_SCOPE that intentionally fail Python parsing.
-# osint_core/drift.py is documented pseudocode (see CLAUDE.md). Adding an
-# entry here means "this file is exempt from the syntax-error sub-check";
-# it does NOT exempt the file from the unauthorized-call sub-check.
-PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST: tuple[str, ...] = (
-    "osint_core/drift.py",
-)
+# Adding an entry here means "this file is exempt from the syntax-error
+# sub-check"; it does NOT exempt the file from the unauthorized-call sub-check.
+#
+# osint_core/drift.py is now implemented in real Python and must parse, so it
+# is deliberately NOT exempt: a future syntax error there should fail the guard
+# rather than be masked.
+PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST: tuple[str, ...] = ()
 
 
 def is_requests_call(node: ast.Call) -> bool:

@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Literal
 
+from .drift import recommend_correction
 from .policy import (
     PolicyEvaluation,
     evaluate_modules,
@@ -399,7 +400,7 @@ class OrchestratorAgent:
         )
 
         # Step 6: Choose correction verb
-        correction_verb = self._choose_correction(drift_vector, policy_eval)
+        correction_verb = self._choose_correction(drift_vector)
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         # Ensure we always return at least 1ms to indicate actual work was done
@@ -516,9 +517,11 @@ class OrchestratorAgent:
             "policy": 0.0,
         }
 
-        # Policy drift: blocked modules indicate policy boundary hit
+        # Policy drift: a blocked module is a policy boundary hit. Policy drift
+        # is revert-class on the canonical drift scale (osint_core.drift), so it
+        # is scored at the REVERT threshold rather than an ad-hoc 0.4.
         if policy_eval.blocked_modules:
-            drift["policy"] = 0.4
+            drift["policy"] = 0.6
 
         # Operational drift: failed skills
         failed_count = sum(1 for r in skill_results if r.status == ExecutionStatus.FAILED)
@@ -530,35 +533,17 @@ class OrchestratorAgent:
 
         return drift
 
-    def _choose_correction(
-        self,
-        drift_vector: dict[str, float],
-        policy_eval: PolicyEvaluation,
-    ) -> str:
+    def _choose_correction(self, drift_vector: dict[str, float]) -> str:
         """
-        Choose correction verb based on drift vector.
+        Choose a correction verb from the drift vector.
 
-        Priority: policy > structural > behavioral > adversarial > operational > statistical
+        Delegates to :func:`osint_core.drift.recommend_correction`, the single
+        source of truth for correction thresholds and priority
+        (policy > structural > behavioral > adversarial > operational >
+        statistical). This orchestrator intentionally keeps no parallel
+        threshold table of its own.
         """
-        if drift_vector.get("policy", 0.0) >= 0.4:
-            return "CONSTRAIN"
-
-        if drift_vector.get("structural", 0.0) >= 0.5:
-            return "REVERT"
-
-        if drift_vector.get("behavioral", 0.0) >= 0.5:
-            return "REVERT"
-
-        if drift_vector.get("adversarial", 0.0) >= 0.3:
-            return "CONSTRAIN"
-
-        if drift_vector.get("operational", 0.0) >= 0.4:
-            return "CONSTRAIN"
-
-        if drift_vector.get("statistical", 0.0) >= 0.5 and drift_vector.get("adversarial", 0.0) == 0:
-            return "ADAPT"
-
-        return "OBSERVE"
+        return recommend_correction(drift_vector)
 
 
 # =============================================================================
