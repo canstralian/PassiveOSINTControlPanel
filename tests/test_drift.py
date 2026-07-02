@@ -243,6 +243,31 @@ def test_policy_violation_creates_policy_signal_and_revert_recommendation(
     assert any(signal.drift_type == DriftType.POLICY for signal in assessment.signals)
 
 
+def test_policy_violation_with_none_code_and_message_is_normalized(
+    telemetry: TelemetrySnapshot,
+    baseline: dict[str, Any],
+) -> None:
+    # A violation may carry an explicit None code/message; the signal name must
+    # fall back to "unknown" and reason must stay a str (not the literal "None").
+    policy_result = make_policy_result(
+        decision="constrain",
+        violations=[{"code": None, "message": None, "module": "port_scan"}],
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    policy_signals = [s for s in assessment.signals if s.drift_type == DriftType.POLICY]
+    assert len(policy_signals) == 1
+    signal = policy_signals[0]
+    assert signal.name == "policy_violation:unknown"
+    assert isinstance(signal.reason, str)
+    assert signal.reason == "Policy violation detected"
+
+
 def test_authorization_gate_trigger_creates_policy_signal(
     baseline: dict[str, Any],
 ) -> None:

@@ -179,20 +179,22 @@ _POLICY_VIOLATION_DEFAULT_SCORE = 0.8
 def _check_policy_drift(policy_result: Mapping[str, Any]) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
     for violation in policy_result.get("violations", []) or []:
-        code = str(violation.get("code", "")) if isinstance(violation, Mapping) else ""
+        is_mapping = isinstance(violation, Mapping)
+        # A violation may carry an explicit ``None`` code/message; normalise both
+        # so the signal name falls back to "unknown" and reason stays a ``str``.
+        code_value = violation.get("code") if is_mapping else None
+        code = str(code_value) if code_value is not None else ""
         score = _POLICY_VIOLATION_SCORES.get(code, _POLICY_VIOLATION_DEFAULT_SCORE)
+        message = violation.get("message") if is_mapping else None
+        reason = str(message) if message is not None else "Policy violation detected"
         signals.append(
             DriftSignal(
                 name=f"policy_violation:{code or 'unknown'}",
                 drift_type=DriftType.POLICY,
                 score=score,
-                reason=(
-                    violation.get("message", "Policy violation detected")
-                    if isinstance(violation, Mapping)
-                    else "Policy violation detected"
-                ),
+                reason=reason,
                 tier="T1",
-                evidence={"violation": dict(violation) if isinstance(violation, Mapping) else violation},
+                evidence={"violation": dict(violation) if is_mapping else violation},
             )
         )
     return signals
@@ -411,12 +413,16 @@ def choose_dominant_drift_type(vector: DriftVector) -> DriftType | None:
 def _coerce_vector(vector: DriftVector | Mapping[str, float]) -> DriftVector:
     if isinstance(vector, DriftVector):
         return vector
-    return DriftVector(
-        **{
-            drift_type.value: float(vector.get(drift_type.value, 0.0))
-            for drift_type in DriftType
-        }
-    )
+    scores: dict[str, float] = {}
+    for drift_type in DriftType:
+        value = vector.get(drift_type.value)
+        # Tolerate a mapping that omits a class or carries a None / non-numeric
+        # value: treat anything not castable to float as zero drift.
+        try:
+            scores[drift_type.value] = float(value) if value is not None else 0.0
+        except (TypeError, ValueError):
+            scores[drift_type.value] = 0.0
+    return DriftVector(**scores)
 
 
 def recommend_correction(vector: DriftVector | Mapping[str, float]) -> CorrectionVerb:
