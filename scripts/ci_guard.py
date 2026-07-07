@@ -20,6 +20,7 @@ Usage:
     python scripts/ci_guard.py --list
     python scripts/ci_guard.py --json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -284,12 +285,20 @@ FORBIDDEN_TOOL_PATTERN = re.compile(
 # tests, and the guard implementation itself. Each entry must justify why
 # the literal appears in a passive-first repo.
 FORBIDDEN_TOOLS_PATH_ALLOWLIST: tuple[str, ...] = (
-    "osint_core/policy.py",      # ALIASES maps offensive tool names to canonical modules.
-    "osint_core/intent.py",      # forbidden-set classification references the same names.
-    "tests/test_policy.py",      # asserts ALIASES["nmap"] -> "port_scan".
-    "tests/test_intent.py",      # asserts requesting "nmap" yields critical risk.
-    "tests/test_ci_guard.py",    # exercises this rule with synthetic samples.
-    "scripts/ci_guard.py",       # this file declares the forbidden list.
+    "osint_core/policy.py",  # ALIASES maps offensive tool names to canonical modules.
+    "osint_core/intent.py",  # forbidden-set classification references the same names.
+    "policy/passive_scope_rules.yaml",  # declares the same names as forbidden_modules.
+    "tests/test_policy.py",  # asserts ALIASES["nmap"] -> "port_scan".
+    "tests/test_intent.py",  # asserts requesting "nmap" yields critical risk.
+    "tests/test_ci_guard.py",  # exercises this rule with synthetic samples.
+    "tests/test_enrichment.py",  # asserts "nmap" resolves to port_scan and is excluded.
+    "tests/test_constraints.py",  # asserts forbidden tool requests are blocked.
+    "tests/test_invention_loop.py",  # asserts the invention loop blocks "nmap".
+    "tests/test_passive_boundaries.py",  # asserts boundary rejection of offensive tooling.
+    "tests/test_adaptation.py",  # constraint-pressure fixtures request blocked tooling.
+    "tests/test_audit.py",  # audit fixtures include blocked-module evaluations.
+    "tests/test_constraint_ledger.py",  # ledger fixtures include blocked-module events.
+    "scripts/ci_guard.py",  # this file declares the forbidden list.
 )
 
 
@@ -326,9 +335,7 @@ RAW_INDICATOR_SCOPE: tuple[str, ...] = ("osint_core/",)
 
 # osint_core/validators.py declares ipaddress.ip_network("192.168.0.0/16") as
 # part of the RFC1918 deny list. That is policy code, not indicator leakage.
-RAW_INDICATOR_FILE_ALLOWLIST: tuple[str, ...] = (
-    "osint_core/validators.py",
-)
+RAW_INDICATOR_FILE_ALLOWLIST: tuple[str, ...] = ("osint_core/validators.py",)
 
 
 def check_raw_indicator_leakage(root: Path) -> list[Finding]:
@@ -346,8 +353,7 @@ def check_raw_indicator_leakage(root: Path) -> list[Finding]:
                         path=path,
                         line=line_number,
                         message=(
-                            "Possible raw indicator leakage: "
-                            f"{line.strip()[:120]}"
+                            f"Possible raw indicator leakage: {line.strip()[:120]}"
                         ),
                     )
                 )
@@ -372,9 +378,7 @@ PASSIVE_FIRST_SCOPE: tuple[str, ...] = ("osint_core/",)
 # osint_core/drift.py is documented pseudocode (see CLAUDE.md). Adding an
 # entry here means "this file is exempt from the syntax-error sub-check";
 # it does NOT exempt the file from the unauthorized-call sub-check.
-PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST: tuple[str, ...] = (
-    "osint_core/drift.py",
-)
+PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST: tuple[str, ...] = ("osint_core/drift.py",)
 
 
 def is_requests_call(node: ast.Call) -> bool:
@@ -428,8 +432,7 @@ def check_passive_first(root: Path) -> list[Finding]:
                     path=path,
                     line=exc.lineno,
                     message=(
-                        f"Python syntax error blocks passive_first analysis: "
-                        f"{exc.msg}"
+                        f"Python syntax error blocks passive_first analysis: {exc.msg}"
                     ),
                 )
             )
