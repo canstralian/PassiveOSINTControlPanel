@@ -2,8 +2,6 @@
 Tests for osint_core.orchestrator module
 """
 
-import pytest
-
 from osint_core.orchestrator import (
     OrchestratorAgent,
     ExecutionStatus,
@@ -126,7 +124,12 @@ def test_execute_workflow_blocks_unauthorized_modules():
     assert "resource_links" in workflow.policy_evaluation.allowed_modules
     assert "http_headers" in workflow.policy_evaluation.blocked_modules
     # Only resource_links should be executed
-    assert len([r for r in workflow.skill_results if r.status == ExecutionStatus.COMPLETED]) == 1
+    assert (
+        len(
+            [r for r in workflow.skill_results if r.status == ExecutionStatus.COMPLETED]
+        )
+        == 1
+    )
 
 
 def test_execute_workflow_allows_authorized_modules():
@@ -176,7 +179,9 @@ def test_execute_workflow_blocks_wrong_indicator_type():
     assert workflow.context.indicator_type == "username"
     assert "dns_records" in workflow.policy_evaluation.allowed_modules
     # DNS skill should be blocked because username is not compatible
-    dns_result = next((r for r in workflow.skill_results if r.skill_name == "DNS Records"), None)
+    dns_result = next(
+        (r for r in workflow.skill_results if r.skill_name == "DNS Records"), None
+    )
     assert dns_result is not None
     assert dns_result.status == ExecutionStatus.BLOCKED
 
@@ -248,7 +253,12 @@ def test_skills_registry_structure():
         assert isinstance(skill.required_indicator_types, list)
         assert isinstance(skill.tools, list)
         assert isinstance(skill.requires_authorization, bool)
-        assert skill.category in ["validation", "passive_lookup", "conditional_fetch", "analysis"]
+        assert skill.category in [
+            "validation",
+            "passive_lookup",
+            "conditional_fetch",
+            "analysis",
+        ]
 
 
 def test_url_parsing_skill():
@@ -282,5 +292,7 @@ def test_multiple_modules_execution():
     )
 
     assert len(workflow.skill_results) == 2
-    completed = [r for r in workflow.skill_results if r.status == ExecutionStatus.COMPLETED]
+    completed = [
+        r for r in workflow.skill_results if r.status == ExecutionStatus.COMPLETED
+    ]
     assert len(completed) == 2

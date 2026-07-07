@@ -14,8 +14,12 @@ def test_invention_loop_runs_all_four_loops():
     response = run_invention_loop(request, run_id="invent_test")
 
     assert response.run_id == "invent_test"
-    assert [action.action_id for action in response.evaluation.allowed_actions] == ["resource_links"]
-    assert [action.action_id for action in response.evaluation.blocked_actions] == ["http_headers"]
+    assert [action.action_id for action in response.evaluation.allowed_actions] == [
+        "resource_links"
+    ]
+    assert [action.action_id for action in response.evaluation.blocked_actions] == [
+        "http_headers"
+    ]
     assert [
         action.action_id for action in response.evaluation.requires_approval_actions
     ] == ["http_headers"]
@@ -34,7 +38,9 @@ def test_operator_authorized_mode_can_allow_conditional_when_not_passive_only():
 
     response = run_invention_loop(request, run_id="invent_test")
 
-    assert [action.action_id for action in response.evaluation.allowed_actions] == ["http_headers"]
+    assert [action.action_id for action in response.evaluation.allowed_actions] == [
+        "http_headers"
+    ]
     assert response.evaluation.blocked_actions == []
     assert response.evaluation.requires_approval_actions == []
 
@@ -50,7 +56,9 @@ def test_non_authorized_modes_force_passive_only():
 
     response = run_invention_loop(request, run_id="invent_test")
 
-    assert [action.action_id for action in response.evaluation.blocked_actions] == ["http_headers"]
+    assert [action.action_id for action in response.evaluation.blocked_actions] == [
+        "http_headers"
+    ]
     assert [
         action.action_id for action in response.evaluation.requires_approval_actions
     ] == ["http_headers"]

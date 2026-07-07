@@ -105,7 +105,9 @@ ADAPTIVE_CHECKS: tuple[str, ...] = (
 
 
 def total_required_time_ms(packet: DecisionPacket) -> int:
-    return packet.verification_cost_ms + packet.execution_cost_ms + packet.rollback_cost_ms
+    return (
+        packet.verification_cost_ms + packet.execution_cost_ms + packet.rollback_cost_ms
+    )
 
 
 def fits_deadline(packet: DecisionPacket) -> bool:
@@ -142,7 +144,9 @@ def safe_utility(packet: DecisionPacket) -> float:
     )
 
 
-def schedule_decision(packet: DecisionPacket, state: SystemState | None = None) -> ScheduleDecision:
+def schedule_decision(
+    packet: DecisionPacket, state: SystemState | None = None
+) -> ScheduleDecision:
     state = state or SystemState()
 
     missing_invariants = invariant_violations(packet)
@@ -169,13 +173,28 @@ def schedule_decision(packet: DecisionPacket, state: SystemState | None = None) 
         )
 
     if state.shortcut_debt.score >= state.shortcut_debt_limit:
-        return containment_decision(packet, ScheduleReason.SHORTCUT_DEBT_TOO_HIGH, "Shortcut debt exceeded configured limit.")
+        return containment_decision(
+            packet,
+            ScheduleReason.SHORTCUT_DEBT_TOO_HIGH,
+            "Shortcut debt exceeded configured limit.",
+        )
 
-    if state.trust_state in {"contested", "unsafe"} or state.hardware_state in {"contested", "unsafe"}:
-        return containment_decision(packet, ScheduleReason.TRUST_STATE_DEGRADED, "Trust or hardware state is contested/unsafe.")
+    if state.trust_state in {"contested", "unsafe"} or state.hardware_state in {
+        "contested",
+        "unsafe",
+    }:
+        return containment_decision(
+            packet,
+            ScheduleReason.TRUST_STATE_DEGRADED,
+            "Trust or hardware state is contested/unsafe.",
+        )
 
     if packet.confidence < 0.30 and packet.risk_label in {"high", "critical"}:
-        return containment_decision(packet, ScheduleReason.LOW_CONFIDENCE, "Confidence too low for high-impact decision.")
+        return containment_decision(
+            packet,
+            ScheduleReason.LOW_CONFIDENCE,
+            "Confidence too low for high-impact decision.",
+        )
 
     if fits_deadline(packet):
         if packet.risk_label in {"low", "medium"} and packet.reversibility >= 0.50:
@@ -196,11 +215,17 @@ def schedule_decision(packet: DecisionPacket, state: SystemState | None = None) 
             authority_scale=0.75,
             required_checks=tuple(packet.required_checks),
             skipped_checks=(),
-            notes=("High-impact or lower-reversibility action fits full verification window.",),
+            notes=(
+                "High-impact or lower-reversibility action fits full verification window.",
+            ),
         )
 
     if packet.reversibility >= 0.75:
-        return containment_decision(packet, ScheduleReason.DEADLINE_TOO_TIGHT, "Full verification/execution/rollback does not fit deadline.")
+        return containment_decision(
+            packet,
+            ScheduleReason.DEADLINE_TOO_TIGHT,
+            "Full verification/execution/rollback does not fit deadline.",
+        )
 
     return ScheduleDecision(
         route="FAIL_CLOSED",
@@ -213,8 +238,12 @@ def schedule_decision(packet: DecisionPacket, state: SystemState | None = None) 
     )
 
 
-def containment_decision(packet: DecisionPacket, reason: ScheduleReason, note: str) -> ScheduleDecision:
-    skipped = tuple(check for check in ADAPTIVE_CHECKS if check in packet.required_checks)
+def containment_decision(
+    packet: DecisionPacket, reason: ScheduleReason, note: str
+) -> ScheduleDecision:
+    skipped = tuple(
+        check for check in ADAPTIVE_CHECKS if check in packet.required_checks
+    )
     effective = tuple(check for check in packet.required_checks if check not in skipped)
     return ScheduleDecision(
         route="CONTAINMENT",

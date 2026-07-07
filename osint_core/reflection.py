@@ -21,9 +21,13 @@ def reflect_on_event(event: ConstraintEvent) -> ReflectionFinding:
     if event.constraint_id == "authorized_target_required":
         reusable_pattern = "Gate target-touching modules behind explicit authorization."
     elif event.constraint_id == "forbidden_capability":
-        reusable_pattern = "Replace active or intrusive capability with passive source correlation."
+        reusable_pattern = (
+            "Replace active or intrusive capability with passive source correlation."
+        )
     elif event.constraint_id == "unknown_module":
-        reusable_pattern = "Reject unregistered modules until they are declared in policy."
+        reusable_pattern = (
+            "Reject unregistered modules until they are declared in policy."
+        )
     elif event.constraint_id == "module_allowed":
         reusable_pattern = "Preserve low-risk passive path as a stable default."
 

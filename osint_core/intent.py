@@ -32,7 +32,9 @@ IntentAction = Literal[
 ]
 
 RiskLabel = Literal["low", "medium", "high", "critical"]
-RollbackStrategy = Literal["none", "observe_only", "disable_module", "sandbox", "revert"]
+RollbackStrategy = Literal[
+    "none", "observe_only", "disable_module", "sandbox", "revert"
+]
 IndicatorType = Literal["domain", "username", "email", "ip", "url", "unknown"]
 
 
@@ -201,7 +203,9 @@ def sign_intent(packet: IntentPacket, secret: str | None = None) -> IntentPacket
 
 def verify_intent_signature(packet: IntentPacket, secret: str | None = None) -> bool:
     if not packet.signature:
-        raise IntentValidationError("Intent packet is unsigned.", IntentErrorCode.UNSIGNED_PACKET)
+        raise IntentValidationError(
+            "Intent packet is unsigned.", IntentErrorCode.UNSIGNED_PACKET
+        )
 
     expected = sign_payload(packet.unsigned_payload(), secret=secret)
     if not hmac.compare_digest(expected, packet.signature):
@@ -290,7 +294,14 @@ def validate_scope(scope: IntentScope) -> IntentValidationResult:
         errors.append("scope.target_hash must look like a cryptographic hash.")
         codes.append(IntentErrorCode.INVALID_SCOPE)
 
-    if scope.indicator_type not in {"domain", "username", "email", "ip", "url", "unknown"}:
+    if scope.indicator_type not in {
+        "domain",
+        "username",
+        "email",
+        "ip",
+        "url",
+        "unknown",
+    }:
         errors.append("scope.indicator_type is invalid.")
         codes.append(IntentErrorCode.INVALID_SCOPE)
 
@@ -304,10 +315,14 @@ def validate_scope(scope: IntentScope) -> IntentValidationResult:
 
     overlap = set(scope.allowed_operations).intersection(scope.forbidden_operations)
     if overlap:
-        errors.append(f"Allowed operations include forbidden operation(s): {sorted(overlap)}")
+        errors.append(
+            f"Allowed operations include forbidden operation(s): {sorted(overlap)}"
+        )
         codes.append(IntentErrorCode.FORBIDDEN_OPERATION_REQUESTED)
 
-    return IntentValidationResult(ok=not errors, errors=tuple(errors), error_codes=tuple(codes))
+    return IntentValidationResult(
+        ok=not errors, errors=tuple(errors), error_codes=tuple(codes)
+    )
 
 
 def validate_scope_or_raise(scope: IntentScope) -> None:
@@ -346,10 +361,14 @@ def validate_intent(packet: IntentPacket) -> IntentValidationResult:
 
     raw_leak_paths = find_raw_indicator_fields(packet.to_dict())
     if raw_leak_paths:
-        errors.append(f"Raw indicator-like field(s) are not allowed in intent packet: {raw_leak_paths}")
+        errors.append(
+            f"Raw indicator-like field(s) are not allowed in intent packet: {raw_leak_paths}"
+        )
         codes.append(IntentErrorCode.RAW_INDICATOR_LEAK)
 
-    return IntentValidationResult(ok=not errors, errors=tuple(errors), error_codes=tuple(codes))
+    return IntentValidationResult(
+        ok=not errors, errors=tuple(errors), error_codes=tuple(codes)
+    )
 
 
 def validate_intent_or_raise(packet: IntentPacket) -> None:
@@ -377,11 +396,15 @@ def find_raw_indicator_fields(value: Any, path: str = "") -> list[str]:
 
 
 def intent_fingerprint(packet: IntentPacket) -> str:
-    return hashlib.sha256(packet.to_json(include_signature=True).encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        packet.to_json(include_signature=True).encode("utf-8")
+    ).hexdigest()
 
 
 def unsigned_intent_fingerprint(packet: IntentPacket) -> str:
-    return hashlib.sha256(packet.to_json(include_signature=False).encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        packet.to_json(include_signature=False).encode("utf-8")
+    ).hexdigest()
 
 
 def risk_score(risk_label: RiskLabel) -> float:
@@ -409,7 +432,9 @@ def derive_risk_label(
     authorized_target: bool,
     contains_conditional_operation: bool = False,
 ) -> RiskLabel:
-    modules = {str(module).strip().lower().replace(" ", "_") for module in requested_modules}
+    modules = {
+        str(module).strip().lower().replace(" ", "_") for module in requested_modules
+    }
 
     forbidden = {
         "port_scan",

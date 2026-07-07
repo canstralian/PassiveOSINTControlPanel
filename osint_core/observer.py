@@ -12,7 +12,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
+
+if TYPE_CHECKING:
+    from .intent import IntentPacket
+    from .policy import PolicyEvaluation
 
 
 class ObserverSeverity(str, Enum):
@@ -53,7 +57,10 @@ class ObserverAssessment:
 
     @property
     def has_critical_violation(self) -> bool:
-        return any((not check.ok) and check.severity == ObserverSeverity.CRITICAL for check in self.checks)
+        return any(
+            (not check.ok) and check.severity == ObserverSeverity.CRITICAL
+            for check in self.checks
+        )
 
 
 RAW_AUDIT_KEYS = {
@@ -68,7 +75,9 @@ RAW_AUDIT_KEYS = {
 }
 
 
-def observe_execution(intent: IntentPacket, trace: ExecutionTrace, policy_result: PolicyEvaluation) -> ObserverAssessment:
+def observe_execution(
+    intent: IntentPacket, trace: ExecutionTrace, policy_result: PolicyEvaluation
+) -> ObserverAssessment:
     checks = (
         check_intent_trace_match(intent, trace),
         check_modules_match_policy(trace, policy_result),
@@ -91,7 +100,9 @@ def check_intent_trace_match(intent: Any, trace: ExecutionTrace) -> ObserverChec
     )
 
 
-def check_modules_match_policy(trace: ExecutionTrace, policy_result: Any) -> ObserverCheck:
+def check_modules_match_policy(
+    trace: ExecutionTrace, policy_result: Any
+) -> ObserverCheck:
     if isinstance(policy_result, dict):
         allowed = set(policy_result.get("allowed_modules", []))
     else:

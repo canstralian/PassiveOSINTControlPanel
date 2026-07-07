@@ -26,14 +26,18 @@ def make_run_id(prefix: str = "invent") -> str:
     return f"{prefix}_{stamp}_{uuid.uuid4().hex[:8]}"
 
 
-def passive_only_for_mode(authority_mode: AuthorityMode, requested_passive_only: bool) -> bool:
+def passive_only_for_mode(
+    authority_mode: AuthorityMode, requested_passive_only: bool
+) -> bool:
     """Resolve passive-only enforcement from the requested authority mode."""
     if authority_mode == "operator_authorized":
         return requested_passive_only
     return True
 
 
-def run_invention_loop(request: InventionRequest, *, run_id: str | None = None) -> InventionResponse:
+def run_invention_loop(
+    request: InventionRequest, *, run_id: str | None = None
+) -> InventionResponse:
     """
     Execute the four-loop planning circuit.
 

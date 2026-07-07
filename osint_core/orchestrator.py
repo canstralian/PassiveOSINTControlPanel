@@ -24,18 +24,16 @@ The orchestrator pattern:
 
 from __future__ import annotations
 
-import subprocess
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from .policy import (
     PolicyEvaluation,
     evaluate_modules,
-    enforce_correction_verb,
 )
 from .validators import (
     IndicatorType,
@@ -68,6 +66,7 @@ class Tool:
 
     Examples: DNS query, whois lookup, HTTP request, file parsing
     """
+
     name: str
     tool_type: ToolType
     description: str
@@ -82,6 +81,7 @@ class Skill:
 
     Examples: "Resolve DNS", "Fetch WHOIS", "Parse URL"
     """
+
     name: str
     category: SkillCategory
     description: str
@@ -96,6 +96,7 @@ class ExecutionContext:
     """
     Execution context tracks the state of an enrichment workflow.
     """
+
     run_id: str
     started_at: str
     indicator_type: IndicatorType
@@ -114,6 +115,7 @@ class SkillResult:
     """
     Result from executing a skill.
     """
+
     skill_name: str
     status: ExecutionStatus
     data: dict[str, Any] = field(default_factory=dict)
@@ -126,6 +128,7 @@ class EnrichmentWorkflow:
     """
     Complete enrichment workflow result.
     """
+
     context: ExecutionContext
     validation_result: ValidationResult
     policy_evaluation: PolicyEvaluation
@@ -241,6 +244,7 @@ SKILLS_REGISTRY: dict[str, Skill] = {
 # =============================================================================
 # Orchestrator agent
 # =============================================================================
+
 
 class OrchestratorAgent:
     """
@@ -429,20 +433,27 @@ class OrchestratorAgent:
         for module_name in allowed_modules:
             skill = self.skills.get(module_name)
             if not skill:
-                results.append(SkillResult(
-                    skill_name=module_name,
-                    status=ExecutionStatus.FAILED,
-                    error=f"Skill not found: {module_name}",
-                ))
+                results.append(
+                    SkillResult(
+                        skill_name=module_name,
+                        status=ExecutionStatus.FAILED,
+                        error=f"Skill not found: {module_name}",
+                    )
+                )
                 continue
 
             # Check if indicator type is supported by this skill
-            if skill.required_indicator_types and context.indicator_type not in skill.required_indicator_types:
-                results.append(SkillResult(
-                    skill_name=skill.name,
-                    status=ExecutionStatus.BLOCKED,
-                    error=f"Skill {skill.name} requires indicator type in {skill.required_indicator_types}, got {context.indicator_type}",
-                ))
+            if (
+                skill.required_indicator_types
+                and context.indicator_type not in skill.required_indicator_types
+            ):
+                results.append(
+                    SkillResult(
+                        skill_name=skill.name,
+                        status=ExecutionStatus.BLOCKED,
+                        error=f"Skill {skill.name} requires indicator type in {skill.required_indicator_types}, got {context.indicator_type}",
+                    )
+                )
                 continue
 
             # Execute skill
@@ -521,7 +532,9 @@ class OrchestratorAgent:
             drift["policy"] = 0.4
 
         # Operational drift: failed skills
-        failed_count = sum(1 for r in skill_results if r.status == ExecutionStatus.FAILED)
+        failed_count = sum(
+            1 for r in skill_results if r.status == ExecutionStatus.FAILED
+        )
         if failed_count > 0:
             drift["operational"] = min(0.2 * failed_count, 1.0)
 
@@ -555,7 +568,10 @@ class OrchestratorAgent:
         if drift_vector.get("operational", 0.0) >= 0.4:
             return "CONSTRAIN"
 
-        if drift_vector.get("statistical", 0.0) >= 0.5 and drift_vector.get("adversarial", 0.0) == 0:
+        if (
+            drift_vector.get("statistical", 0.0) >= 0.5
+            and drift_vector.get("adversarial", 0.0) == 0
+        ):
             return "ADAPT"
 
         return "OBSERVE"
@@ -564,6 +580,7 @@ class OrchestratorAgent:
 # =============================================================================
 # Public API
 # =============================================================================
+
 
 def create_orchestrator() -> OrchestratorAgent:
     """

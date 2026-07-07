@@ -4,6 +4,7 @@ Each rule is exercised against a synthetic repository so the test suite does
 not depend on the surrounding project layout. Tests assert on rule names and
 finding paths, never on grep output strings.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -99,8 +100,7 @@ def test_forbidden_tools_flags_unallowlisted_reference(fake_repo: Path) -> None:
     )
     findings = ci_guard.check_forbidden_tools(fake_repo)
     assert any(
-        f.rule == "forbidden_tools"
-        and f.path.as_posix() == "osint_core/scanner.py"
+        f.rule == "forbidden_tools" and f.path.as_posix() == "osint_core/scanner.py"
         for f in findings
     )
 
@@ -121,7 +121,7 @@ def test_forbidden_tools_word_boundary_avoids_false_positive(
     # "metasploitable" contains the substring "metasploit" but is not a tool
     # invocation; the regex must require word boundaries.
     (fake_repo / "osint_core" / "notes.py").write_text(
-        '# the metasploitable_lab fixture is unrelated\n',
+        "# the metasploitable_lab fixture is unrelated\n",
     )
     findings = ci_guard.check_forbidden_tools(fake_repo)
     assert findings == []
@@ -181,8 +181,7 @@ def test_passive_first_flags_unauthorized_get(fake_repo: Path) -> None:
     )
     findings = ci_guard.check_passive_first(fake_repo)
     assert any(
-        f.rule == "passive_first"
-        and f.path.as_posix() == "osint_core/fetcher.py"
+        f.rule == "passive_first" and f.path.as_posix() == "osint_core/fetcher.py"
         for f in findings
     )
 

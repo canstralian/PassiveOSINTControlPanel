@@ -44,7 +44,9 @@ def test_passive_mode_blocks_target_touching_modules_even_when_authorized():
         "http_headers",
         "robots_txt",
     ]
-    assert {event.constraint_id for event in result.events} == {"authorized_target_required"}
+    assert {event.constraint_id for event in result.events} == {
+        "authorized_target_required"
+    }
 
 
 def test_invention_engine_does_not_expand_authority_from_objective_text():

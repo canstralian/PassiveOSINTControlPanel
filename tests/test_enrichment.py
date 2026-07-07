@@ -8,7 +8,6 @@ operations are triggered.
 
 from __future__ import annotations
 
-import pytest
 
 from osint_core.enrichment import plan_passive_enrichment
 from osint_core.types import ProposedAction

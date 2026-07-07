@@ -69,7 +69,9 @@ def test_write_constraint_ledger_writes_json(tmp_path):
     assert data["run_id"] == "run_test"
     assert data["allowed_actions"] == ["resource_links"]
     assert data["blocked_actions"] == ["port_scan"]
-    assert any(event["constraint_id"] == "forbidden_capability" for event in data["events"])
+    assert any(
+        event["constraint_id"] == "forbidden_capability" for event in data["events"]
+    )
 
 
 def test_write_constraint_ledger_rejects_path_traversal_run_id(tmp_path):

@@ -67,11 +67,11 @@ MAX_DOMAIN_LENGTH = 253
 MAX_URL_LENGTH = 2048
 
 CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
-DOMAIN_RE = re.compile(
-    r"^(?=.{1,253}$)(?!-)(?:[a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,63}$"
-)
+DOMAIN_RE = re.compile(r"^(?=.{1,253}$)(?!-)(?:[a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,63}$")
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_.-]{2,64}$")
-EMAIL_RE = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,63}$")
+EMAIL_RE = re.compile(
+    r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,63}$"
+)
 
 DANGEROUS_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
@@ -104,7 +104,9 @@ PRIVATE_NETS = [
 ]
 
 
-def validate_indicator(raw_value: str, forced_type: str = "Auto", allow_private_targets: bool = False) -> ValidationResult:
+def validate_indicator(
+    raw_value: str, forced_type: str = "Auto", allow_private_targets: bool = False
+) -> ValidationResult:
     """
     Validate and normalize a user-supplied OSINT indicator.
 
@@ -132,7 +134,9 @@ def validate_indicator(raw_value: str, forced_type: str = "Auto", allow_private_
         forced = normalize_forced_type(forced_type)
 
         if forced != "auto":
-            indicator_type, normalized = validate_as_type(cleaned, forced, allow_private_targets)
+            indicator_type, normalized = validate_as_type(
+                cleaned, forced, allow_private_targets
+            )
         else:
             indicator_type, normalized = classify_auto(cleaned, allow_private_targets)
 
@@ -252,7 +256,9 @@ def classify_auto(value: str, allow_private_targets: bool) -> tuple[IndicatorTyp
     )
 
 
-def validate_as_type(value: str, forced: str, allow_private_targets: bool) -> tuple[IndicatorType, str]:
+def validate_as_type(
+    value: str, forced: str, allow_private_targets: bool
+) -> tuple[IndicatorType, str]:
     if forced == "domain":
         return validate_domain(value, allow_private_targets)
     if forced == "username":
@@ -264,10 +270,14 @@ def validate_as_type(value: str, forced: str, allow_private_targets: bool) -> tu
     if forced == "url":
         return validate_url(value, allow_private_targets)
 
-    raise ValidationException("Unsupported indicator type.", ValidationErrorCode.INVALID_TYPE)
+    raise ValidationException(
+        "Unsupported indicator type.", ValidationErrorCode.INVALID_TYPE
+    )
 
 
-def validate_domain(value: str, allow_private_targets: bool = False) -> tuple[IndicatorType, str]:
+def validate_domain(
+    value: str, allow_private_targets: bool = False
+) -> tuple[IndicatorType, str]:
     domain = value.strip().lower().rstrip(".")
 
     if len(domain) > MAX_DOMAIN_LENGTH or not DOMAIN_RE.fullmatch(domain):
@@ -276,7 +286,9 @@ def validate_domain(value: str, allow_private_targets: bool = False) -> tuple[In
     labels = domain.split(".")
     for label in labels:
         if label.startswith("-") or label.endswith("-"):
-            raise ValidationException("Invalid domain label.", ValidationErrorCode.INVALID_DOMAIN)
+            raise ValidationException(
+                "Invalid domain label.", ValidationErrorCode.INVALID_DOMAIN
+            )
 
     if domain in LOCAL_HOSTNAMES and not allow_private_targets:
         raise ValidationException(
@@ -287,40 +299,56 @@ def validate_domain(value: str, allow_private_targets: bool = False) -> tuple[In
     return "domain", domain
 
 
-def validate_username(value: str, allow_private_targets: bool = False) -> tuple[IndicatorType, str]:
+def validate_username(
+    value: str, allow_private_targets: bool = False
+) -> tuple[IndicatorType, str]:
     del allow_private_targets
 
     username = value.strip()
 
     if len(username) > MAX_USERNAME_LENGTH or not USERNAME_RE.fullmatch(username):
-        raise ValidationException("Invalid username.", ValidationErrorCode.INVALID_USERNAME)
+        raise ValidationException(
+            "Invalid username.", ValidationErrorCode.INVALID_USERNAME
+        )
 
     if username in {".", ".."}:
-        raise ValidationException("Invalid username.", ValidationErrorCode.INVALID_USERNAME)
+        raise ValidationException(
+            "Invalid username.", ValidationErrorCode.INVALID_USERNAME
+        )
 
     return "username", username
 
 
-def validate_email(value: str, allow_private_targets: bool = False) -> tuple[IndicatorType, str]:
+def validate_email(
+    value: str, allow_private_targets: bool = False
+) -> tuple[IndicatorType, str]:
     email = value.strip().lower()
 
     if len(email) > MAX_EMAIL_LENGTH or not EMAIL_RE.fullmatch(email):
-        raise ValidationException("Invalid email address.", ValidationErrorCode.INVALID_EMAIL)
+        raise ValidationException(
+            "Invalid email address.", ValidationErrorCode.INVALID_EMAIL
+        )
 
     local, domain = email.rsplit("@", 1)
 
     if len(local) > MAX_EMAIL_LOCAL_LENGTH:
-        raise ValidationException("Invalid email local part.", ValidationErrorCode.INVALID_EMAIL)
+        raise ValidationException(
+            "Invalid email local part.", ValidationErrorCode.INVALID_EMAIL
+        )
 
     _, normalized_domain = validate_domain(domain, allow_private_targets)
     return "email", f"{local}@{normalized_domain}"
 
 
-def validate_ip(value: str, allow_private_targets: bool = False) -> tuple[IndicatorType, str]:
+def validate_ip(
+    value: str, allow_private_targets: bool = False
+) -> tuple[IndicatorType, str]:
     try:
         ip = ipaddress.ip_address(value.strip())
     except ValueError as exc:
-        raise ValidationException("Invalid IP address.", ValidationErrorCode.INVALID_IP) from exc
+        raise ValidationException(
+            "Invalid IP address.", ValidationErrorCode.INVALID_IP
+        ) from exc
 
     if not allow_private_targets and is_private_or_local_ip(ip):
         raise ValidationException(
@@ -331,7 +359,9 @@ def validate_ip(value: str, allow_private_targets: bool = False) -> tuple[Indica
     return "ip", str(ip)
 
 
-def validate_url(value: str, allow_private_targets: bool = False) -> tuple[IndicatorType, str]:
+def validate_url(
+    value: str, allow_private_targets: bool = False
+) -> tuple[IndicatorType, str]:
     if len(value) > MAX_URL_LENGTH:
         raise ValidationException("URL is too long.", ValidationErrorCode.TOO_LONG)
 
@@ -345,7 +375,9 @@ def validate_url(value: str, allow_private_targets: bool = False) -> tuple[Indic
 
     hostname = parsed.hostname
     if not hostname:
-        raise ValidationException("Invalid URL hostname.", ValidationErrorCode.INVALID_URL)
+        raise ValidationException(
+            "Invalid URL hostname.", ValidationErrorCode.INVALID_URL
+        )
 
     hostname = hostname.lower().rstrip(".")
 
@@ -365,7 +397,9 @@ def validate_url(value: str, allow_private_targets: bool = False) -> tuple[Indic
     normalized = urlunparse(
         (
             parsed.scheme.lower(),
-            normalized_host if parsed.port is None else f"{normalized_host}:{parsed.port}",
+            normalized_host
+            if parsed.port is None
+            else f"{normalized_host}:{parsed.port}",
             parsed.path or "",
             "",
             parsed.query or "",
@@ -392,11 +426,16 @@ def is_private_or_local_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) ->
     )
 
 
-def assert_valid_or_raise(raw_value: str, forced_type: str = "Auto", allow_private_targets: bool = False) -> tuple[IndicatorType, str]:
+def assert_valid_or_raise(
+    raw_value: str, forced_type: str = "Auto", allow_private_targets: bool = False
+) -> tuple[IndicatorType, str]:
     """
     Convenience helper for callers that prefer exceptions.
     """
     result = validate_indicator(raw_value, forced_type, allow_private_targets)
     if not result.ok:
-        raise ValidationException(result.error or "Validation failed.", result.error_code or ValidationErrorCode.UNSUPPORTED_INDICATOR)
+        raise ValidationException(
+            result.error or "Validation failed.",
+            result.error_code or ValidationErrorCode.UNSUPPORTED_INDICATOR,
+        )
     return result.indicator_type, result.normalized

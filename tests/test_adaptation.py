@@ -7,7 +7,6 @@ mapping, recommendation_id format, and de-duplication logic.
 
 from __future__ import annotations
 
-import pytest
 
 from osint_core.adaptation import recommend_adaptations, recommend_from_event
 from osint_core.types import AdaptationRecommendation, ConstraintEvent
@@ -301,7 +300,9 @@ def test_recommend_from_event_with_real_forbidden_event():
         passive_only=False,
     )
 
-    forbidden_events = [e for e in evaluation.events if e.constraint_id == "forbidden_capability"]
+    forbidden_events = [
+        e for e in evaluation.events if e.constraint_id == "forbidden_capability"
+    ]
     assert forbidden_events, "Expected at least one forbidden_capability event"
 
     rec = recommend_from_event(forbidden_events[0])

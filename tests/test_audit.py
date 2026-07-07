@@ -51,15 +51,18 @@ def test_assert_audit_safe_accepts_nested_safe_payload():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("forbidden_key", [
-    "raw_indicator",
-    "indicator",
-    "email",
-    "domain",
-    "username",
-    "url",
-    "ip",
-])
+@pytest.mark.parametrize(
+    "forbidden_key",
+    [
+        "raw_indicator",
+        "indicator",
+        "email",
+        "domain",
+        "username",
+        "url",
+        "ip",
+    ],
+)
 def test_assert_audit_safe_rejects_raw_indicator_fields(forbidden_key: str):
     payload = {
         "run_id": "run_test",
@@ -142,7 +145,16 @@ def test_write_constraint_audit_no_raw_indicators_in_output(tmp_path: Path):
     path = write_constraint_audit(evaluation, directory=tmp_path)
     data = json.loads(path.read_text(encoding="utf-8"))
 
-    forbidden_keys = {"raw_indicator", "raw_input", "indicator", "domain", "username", "email", "url", "ip"}
+    forbidden_keys = {
+        "raw_indicator",
+        "raw_input",
+        "indicator",
+        "domain",
+        "username",
+        "email",
+        "url",
+        "ip",
+    }
     assert forbidden_keys.isdisjoint(data.keys())
 
 

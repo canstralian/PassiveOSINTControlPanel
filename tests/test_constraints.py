@@ -1,11 +1,18 @@
-from osint_core.constraints import evaluate_constraints, passive_module_actions, propose_actions
+from osint_core.constraints import (
+    evaluate_constraints,
+    passive_module_actions,
+    propose_actions,
+)
 from osint_core.types import ProposedAction
 
 
 def test_propose_actions_uses_canonical_module_names():
     actions = propose_actions(["Resource Links", "HTTP Headers"])
 
-    assert [action.action_id for action in actions] == ["resource_links", "http_headers"]
+    assert [action.action_id for action in actions] == [
+        "resource_links",
+        "http_headers",
+    ]
     assert actions[0].touches_target is False
     assert actions[1].touches_target is True
 
@@ -62,7 +69,9 @@ def test_unknown_module_is_blocked():
         passive_only=True,
     )
 
-    assert [action.action_id for action in result.blocked_actions] == ["unregistered_module"]
+    assert [action.action_id for action in result.blocked_actions] == [
+        "unregistered_module"
+    ]
     assert result.events[0].constraint_id == "unknown_module"
 
 

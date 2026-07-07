@@ -224,7 +224,9 @@ def test_canonical_json_is_deterministic():
 def test_sign_payload_is_deterministic_for_same_payload_and_secret():
     payload = {"a": 1, "b": 2}
     assert sign_payload(payload, TEST_SECRET) == sign_payload(payload, TEST_SECRET)
-    assert sign_payload(payload, TEST_SECRET) != sign_payload(payload, "different-secret")
+    assert sign_payload(payload, TEST_SECRET) != sign_payload(
+        payload, "different-secret"
+    )
 
 
 def test_hash_manifest_payload_is_stable():
@@ -264,28 +266,40 @@ def test_default_rollback_for_risk():
 
 
 def test_derive_risk_label_for_low_risk_passive_modules():
-    assert derive_risk_label(
-        requested_modules=["resource_links"],
-        authorized_target=False,
-    ) == "low"
+    assert (
+        derive_risk_label(
+            requested_modules=["resource_links"],
+            authorized_target=False,
+        )
+        == "low"
+    )
 
 
 def test_derive_risk_label_for_conditional_authorized_modules():
-    assert derive_risk_label(
-        requested_modules=["http_headers"],
-        authorized_target=True,
-    ) == "medium"
+    assert (
+        derive_risk_label(
+            requested_modules=["http_headers"],
+            authorized_target=True,
+        )
+        == "medium"
+    )
 
 
 def test_derive_risk_label_for_conditional_unauthorized_modules():
-    assert derive_risk_label(
-        requested_modules=["http_headers"],
-        authorized_target=False,
-    ) == "high"
+    assert (
+        derive_risk_label(
+            requested_modules=["http_headers"],
+            authorized_target=False,
+        )
+        == "high"
+    )
 
 
 def test_derive_risk_label_for_forbidden_modules():
-    assert derive_risk_label(
-        requested_modules=["nmap"],
-        authorized_target=True,
-    ) == "critical"
+    assert (
+        derive_risk_label(
+            requested_modules=["nmap"],
+            authorized_target=True,
+        )
+        == "critical"
+    )

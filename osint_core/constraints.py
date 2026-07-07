@@ -30,9 +30,13 @@ def propose_actions(requested_modules: list[str]) -> list[ProposedAction]:
         canonical = canonicalize_module_name(raw_name)
         policy = get_module_policy(canonical)
         module_label = policy.name if policy else str(raw_name)
-        requires_authorization = bool(policy.requires_authorization) if policy else False
+        requires_authorization = (
+            bool(policy.requires_authorization) if policy else False
+        )
         touches_target = module_touches_target(canonical)
-        expected_signal = policy.description if policy else "Unknown or unregistered module."
+        expected_signal = (
+            policy.description if policy else "Unknown or unregistered module."
+        )
 
         actions.append(
             ProposedAction(
@@ -205,10 +209,12 @@ def _event_from_violation(
 
 def passive_module_actions() -> list[ProposedAction]:
     """Return registered module actions that are allowed in passive-only mode."""
-    return propose_actions([
-        policy.name
-        for policy in MODULE_POLICIES.values()
-        if policy.risk != "forbidden"
-        and not policy.requires_authorization
-        and not policy.touches_target
-    ])
+    return propose_actions(
+        [
+            policy.name
+            for policy in MODULE_POLICIES.values()
+            if policy.risk != "forbidden"
+            and not policy.requires_authorization
+            and not policy.touches_target
+        ]
+    )
