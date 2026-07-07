@@ -24,9 +24,15 @@ from enum import Enum
 from typing import Any, Literal
 
 
-ComponentType = Literal["model", "service", "module", "workflow", "hardware", "policy", "system"]
-TrustSource = Literal["verification", "drift", "constraint", "audit", "ci", "operator", "reconciliation"]
-RepairAction = Literal["none", "observe", "constrain", "rollback", "quarantine", "adapt"]
+ComponentType = Literal[
+    "model", "service", "module", "workflow", "hardware", "policy", "system"
+]
+TrustSource = Literal[
+    "verification", "drift", "constraint", "audit", "ci", "operator", "reconciliation"
+]
+RepairAction = Literal[
+    "none", "observe", "constrain", "rollback", "quarantine", "adapt"
+]
 VerificationDepth = Literal["normal", "elevated", "strict", "quarantined"]
 PermissionScope = Literal["passive", "conditional", "restricted", "blocked"]
 
@@ -171,12 +177,42 @@ def trust_delta_from_drift(
     deltas: list[TrustDelta] = []
 
     mappings = [
-        ("policy", profile.policy_weight, TrustReason.POLICY_VIOLATION.value, "rollback"),
-        ("structural", profile.structural_weight, TrustReason.STRUCTURAL_DRIFT.value, "rollback"),
-        ("behavioral", profile.behavioral_weight, TrustReason.BEHAVIORAL_DRIFT.value, "constrain"),
-        ("adversarial", profile.adversarial_weight, TrustReason.ADVERSARIAL_DRIFT.value, "constrain"),
-        ("operational", profile.operational_weight, TrustReason.OPERATIONAL_DRIFT.value, "observe"),
-        ("statistical", profile.statistical_weight, TrustReason.STATISTICAL_DRIFT.value, "adapt"),
+        (
+            "policy",
+            profile.policy_weight,
+            TrustReason.POLICY_VIOLATION.value,
+            "rollback",
+        ),
+        (
+            "structural",
+            profile.structural_weight,
+            TrustReason.STRUCTURAL_DRIFT.value,
+            "rollback",
+        ),
+        (
+            "behavioral",
+            profile.behavioral_weight,
+            TrustReason.BEHAVIORAL_DRIFT.value,
+            "constrain",
+        ),
+        (
+            "adversarial",
+            profile.adversarial_weight,
+            TrustReason.ADVERSARIAL_DRIFT.value,
+            "constrain",
+        ),
+        (
+            "operational",
+            profile.operational_weight,
+            TrustReason.OPERATIONAL_DRIFT.value,
+            "observe",
+        ),
+        (
+            "statistical",
+            profile.statistical_weight,
+            TrustReason.STATISTICAL_DRIFT.value,
+            "adapt",
+        ),
     ]
 
     for drift_type, weight, reason, repair_action in mappings:
@@ -219,15 +255,55 @@ def trust_delta_from_reconciliation(
     correction = str(getattr(reconciliation_result, "correction", "")).upper()
 
     if correction == "OBSERVE":
-        return TrustDelta(component_id, component_type, "reconciliation", 0.02, TrustReason.CLEAN_EXECUTION.value, {"correction": correction}, "none")
+        return TrustDelta(
+            component_id,
+            component_type,
+            "reconciliation",
+            0.02,
+            TrustReason.CLEAN_EXECUTION.value,
+            {"correction": correction},
+            "none",
+        )
     if correction == "ADAPT":
-        return TrustDelta(component_id, component_type, "reconciliation", -0.02, TrustReason.STATISTICAL_DRIFT.value, {"correction": correction}, "adapt")
+        return TrustDelta(
+            component_id,
+            component_type,
+            "reconciliation",
+            -0.02,
+            TrustReason.STATISTICAL_DRIFT.value,
+            {"correction": correction},
+            "adapt",
+        )
     if correction == "CONSTRAIN":
-        return TrustDelta(component_id, component_type, "reconciliation", -0.20, TrustReason.OBSERVER_DISSENT.value, {"correction": correction}, "constrain")
+        return TrustDelta(
+            component_id,
+            component_type,
+            "reconciliation",
+            -0.20,
+            TrustReason.OBSERVER_DISSENT.value,
+            {"correction": correction},
+            "constrain",
+        )
     if correction == "REVERT":
-        return TrustDelta(component_id, component_type, "reconciliation", -0.50, TrustReason.BEHAVIORAL_DRIFT.value, {"correction": correction}, "rollback")
+        return TrustDelta(
+            component_id,
+            component_type,
+            "reconciliation",
+            -0.50,
+            TrustReason.BEHAVIORAL_DRIFT.value,
+            {"correction": correction},
+            "rollback",
+        )
 
-    return TrustDelta(component_id, component_type, "reconciliation", -0.80, TrustReason.STRUCTURAL_DRIFT.value, {"correction": correction}, "quarantine")
+    return TrustDelta(
+        component_id,
+        component_type,
+        "reconciliation",
+        -0.80,
+        TrustReason.STRUCTURAL_DRIFT.value,
+        {"correction": correction},
+        "quarantine",
+    )
 
 
 def trust_delta_from_ci(
@@ -237,12 +313,30 @@ def trust_delta_from_ci(
     profile: TrustProfile = DEFAULT_PROFILE,
 ) -> TrustDelta:
     if passed:
-        return TrustDelta(workflow_id, "workflow", "ci", profile.ci_pass_reward, TrustReason.CI_PASSED.value, {"passed": True}, "none")
+        return TrustDelta(
+            workflow_id,
+            "workflow",
+            "ci",
+            profile.ci_pass_reward,
+            TrustReason.CI_PASSED.value,
+            {"passed": True},
+            "none",
+        )
 
-    return TrustDelta(workflow_id, "workflow", "ci", -0.40, TrustReason.CI_FAILED.value, {"passed": False}, "constrain")
+    return TrustDelta(
+        workflow_id,
+        "workflow",
+        "ci",
+        -0.40,
+        TrustReason.CI_FAILED.value,
+        {"passed": False},
+        "constrain",
+    )
 
 
-def initial_trust_state(component_id: str, component_type: ComponentType = "module") -> TrustState:
+def initial_trust_state(
+    component_id: str, component_type: ComponentType = "module"
+) -> TrustState:
     return TrustState(
         component_id=component_id,
         component_type=component_type,

@@ -103,7 +103,9 @@ def test_deadline_too_tight_and_not_reversible_fails_closed():
 
 
 def test_shortcut_debt_forces_containment():
-    state = SystemState(shortcut_debt=ShortcutDebt(emergency_overrides=2), shortcut_debt_limit=0.70)
+    state = SystemState(
+        shortcut_debt=ShortcutDebt(emergency_overrides=2), shortcut_debt_limit=0.70
+    )
     decision = schedule_decision(make_packet(), state)
     assert decision.route == "CONTAINMENT"
     assert decision.reason == ScheduleReason.SHORTCUT_DEBT_TOO_HIGH

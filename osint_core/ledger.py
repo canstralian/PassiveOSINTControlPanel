@@ -30,7 +30,9 @@ def validate_run_id(run_id: str) -> str:
     """Return a filename-safe run ID or raise ValueError."""
     candidate = str(run_id or "")
     if not RUN_ID_RE.fullmatch(candidate):
-        raise ValueError("run_id must be 1-128 filename-safe characters: A-Z a-z 0-9 _ . -")
+        raise ValueError(
+            "run_id must be 1-128 filename-safe characters: A-Z a-z 0-9 _ . -"
+        )
     return candidate
 
 

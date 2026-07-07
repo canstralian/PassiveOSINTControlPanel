@@ -45,18 +45,36 @@ Examples:
   python -m agent.cli --explain "certificate transparency log mining"
         """,
     )
-    parser.add_argument("--target", "-t", help="Target to analyze (domain, IP, username, etc.)")
+    parser.add_argument(
+        "--target", "-t", help="Target to analyze (domain, IP, username, etc.)"
+    )
     parser.add_argument(
         "--type",
-        choices=["full", "passive", "threat", "footprint", "breach", "darkweb", "socmint"],
+        choices=[
+            "full",
+            "passive",
+            "threat",
+            "footprint",
+            "breach",
+            "darkweb",
+            "socmint",
+        ],
         default="full",
         help="Analysis type (default: full)",
     )
     parser.add_argument("--context", "-c", help="Additional context for the analysis")
-    parser.add_argument("--iocs", nargs="+", metavar="IOC", help="IOCs for enrichment report")
-    parser.add_argument("--explain", "-e", metavar="TECHNIQUE", help="Explain an OSINT technique")
-    parser.add_argument("--model", default="claude-3-5-sonnet-20241022", help="Claude model to use")
-    parser.add_argument("--no-stream", action="store_true", help="Disable streaming output")
+    parser.add_argument(
+        "--iocs", nargs="+", metavar="IOC", help="IOCs for enrichment report"
+    )
+    parser.add_argument(
+        "--explain", "-e", metavar="TECHNIQUE", help="Explain an OSINT technique"
+    )
+    parser.add_argument(
+        "--model", default="claude-3-5-sonnet-20241022", help="Claude model to use"
+    )
+    parser.add_argument(
+        "--no-stream", action="store_true", help="Disable streaming output"
+    )
 
     args = parser.parse_args()
     agent = OSINTAgent(model=args.model)

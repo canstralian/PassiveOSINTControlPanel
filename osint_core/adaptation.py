@@ -37,7 +37,9 @@ def recommend_from_event(event: ConstraintEvent) -> AdaptationRecommendation:
     )
 
 
-def recommend_adaptations(events: list[ConstraintEvent]) -> list[AdaptationRecommendation]:
+def recommend_adaptations(
+    events: list[ConstraintEvent],
+) -> list[AdaptationRecommendation]:
     """Return deterministic recommendations, de-duplicated by constraint ID."""
     recommendations: list[AdaptationRecommendation] = []
     seen: set[str] = set()
