@@ -327,7 +327,9 @@ def test_operational_runtime_drift_detected(
     )
 
     assert assessment.drift_vector.operational >= 0.5
-    assert any(signal.name == "runtime_boundary_exceeded" for signal in assessment.signals)
+    assert any(
+        signal.name == "runtime_boundary_exceeded" for signal in assessment.signals
+    )
 
 
 def test_operational_error_drift_detected(
@@ -343,7 +345,9 @@ def test_operational_error_drift_detected(
     )
 
     assert assessment.drift_vector.operational >= 0.6
-    assert any(signal.name == "error_threshold_exceeded" for signal in assessment.signals)
+    assert any(
+        signal.name == "error_threshold_exceeded" for signal in assessment.signals
+    )
 
 
 def test_operational_timeout_drift_detected(
@@ -360,7 +364,9 @@ def test_operational_timeout_drift_detected(
     )
 
     assert assessment.drift_vector.operational > 0.0
-    assert any(signal.name == "timeout_threshold_exceeded" for signal in assessment.signals)
+    assert any(
+        signal.name == "timeout_threshold_exceeded" for signal in assessment.signals
+    )
 
 
 def test_structural_manifest_mismatch_reverts(
@@ -410,7 +416,9 @@ def test_structural_runtime_python_version_mismatch_reverts(
 
     assert assessment.drift_vector.structural > 0.0
     assert assessment.recommended_correction == "REVERT"
-    assert any(signal.name == "runtime_python_version_changed" for signal in assessment.signals)
+    assert any(
+        signal.name == "runtime_python_version_changed" for signal in assessment.signals
+    )
 
 
 def test_behavioral_same_input_different_output_reverts(
@@ -490,7 +498,10 @@ def test_statistical_module_usage_shift_detected(
     )
 
     assert assessment.drift_vector.statistical > 0.0
-    assert any(signal.name == "module_usage_distribution_shifted" for signal in assessment.signals)
+    assert any(
+        signal.name == "module_usage_distribution_shifted"
+        for signal in assessment.signals
+    )
 
 
 def test_policy_drift_overrides_statistical_adaptation(
@@ -570,7 +581,9 @@ def test_estimate_confidence_increases_with_signal_count_and_tier() -> None:
     assert estimate_confidence([high_signal]) > estimate_confidence([low_signal])
 
     # Contract: adding a signal should strictly increase confidence.
-    assert estimate_confidence([low_signal, high_signal]) > estimate_confidence([high_signal])
+    assert estimate_confidence([low_signal, high_signal]) > estimate_confidence(
+        [high_signal]
+    )
 
 
 def test_assess_drift_is_pure_and_does_not_mutate_inputs(
