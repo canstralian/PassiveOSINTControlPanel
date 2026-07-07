@@ -786,6 +786,9 @@ def export_audit_index() -> str | None:
         except Exception:
             continue
 
+    if not rows:
+        return None
+
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
         writer.writeheader()

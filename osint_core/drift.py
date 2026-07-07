@@ -152,7 +152,10 @@ def check_policy_drift(policy_result: Mapping[str, Any]) -> list[DriftSignal]:
 
 def check_adversarial_drift(telemetry: TelemetrySnapshot) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
-    haystacks = (telemetry.rejection_reason, telemetry.sanitized_input_trace)
+    # Scan only the sanitized input trace: rejection_reason carries
+    # system-generated prose, and substring matching against it false-positives
+    # on ordinary punctuation and words like "profile:".
+    haystacks = (telemetry.sanitized_input_trace,)
     for pattern in SUSPICIOUS_PATTERNS:
         if any(pattern in haystack for haystack in haystacks if haystack):
             signals.append(
@@ -231,9 +234,10 @@ def check_structural_drift(
 ) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
 
-    expected_manifest = (
-        manifest.get("hash") if manifest else baseline.get("expected_manifest_hash")
-    )
+    if manifest:
+        expected_manifest = manifest.get("manifest_hash") or manifest.get("hash")
+    else:
+        expected_manifest = baseline.get("expected_manifest_hash")
     if expected_manifest and telemetry.manifest_hash != expected_manifest:
         signals.append(
             DriftSignal(
@@ -441,8 +445,8 @@ def assess_drift(
     policy_result:
         Serialized policy evaluation for the run (decision, violations, ...).
     manifest:
-        Optional approved manifest; its "hash" overrides the baseline's
-        expected manifest hash when provided.
+        Optional approved manifest; its "manifest_hash" (or legacy "hash")
+        overrides the baseline's expected manifest hash when provided.
     """
     signals: list[DriftSignal] = []
     signals += check_policy_drift(policy_result)
