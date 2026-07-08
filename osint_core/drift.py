@@ -176,8 +176,10 @@ _POLICY_VIOLATION_SCORES: Mapping[str, float] = {
 _POLICY_VIOLATION_DEFAULT_SCORE = 0.8
 
 
-def _check_policy_drift(policy_result: Mapping[str, Any]) -> list[DriftSignal]:
+def _check_policy_drift(policy_result: Mapping[str, Any] | None) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
+    if not policy_result:
+        return signals
     for violation in policy_result.get("violations", []) or []:
         is_mapping = isinstance(violation, Mapping)
         # A violation may carry an explicit ``None`` code/message; normalise both
@@ -224,9 +226,11 @@ def _check_adversarial_drift(telemetry: TelemetrySnapshot) -> list[DriftSignal]:
 
 
 def _check_operational_drift(
-    telemetry: TelemetrySnapshot, baseline: Mapping[str, Any]
+    telemetry: TelemetrySnapshot, baseline: Mapping[str, Any] | None
 ) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
+    if not baseline:
+        return signals
 
     runtime_p95 = baseline.get("runtime_p95_ms")
     if runtime_p95 is not None and telemetry.duration_ms > runtime_p95 * 2:
@@ -271,9 +275,11 @@ def _check_operational_drift(
 
 
 def _check_structural_drift(
-    telemetry: TelemetrySnapshot, baseline: Mapping[str, Any]
+    telemetry: TelemetrySnapshot, baseline: Mapping[str, Any] | None
 ) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
+    if not baseline:
+        return signals
 
     expected_manifest = baseline.get("expected_manifest_hash")
     if expected_manifest is not None and telemetry.manifest_hash != expected_manifest:
@@ -318,9 +324,11 @@ def _check_structural_drift(
 
 
 def _check_behavioral_drift(
-    telemetry: TelemetrySnapshot, baseline: Mapping[str, Any]
+    telemetry: TelemetrySnapshot, baseline: Mapping[str, Any] | None
 ) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
+    if not baseline:
+        return signals
 
     known_outputs: Mapping[str, str] = baseline.get("known_output_hashes", {}) or {}
     previous_output = known_outputs.get(telemetry.indicator_hash)
@@ -352,9 +360,11 @@ def _check_behavioral_drift(
 
 
 def _check_statistical_drift(
-    telemetry: TelemetrySnapshot, baseline: Mapping[str, Any]
+    telemetry: TelemetrySnapshot, baseline: Mapping[str, Any] | None
 ) -> list[DriftSignal]:
     signals: list[DriftSignal] = []
+    if not baseline:
+        return signals
 
     type_distribution: Mapping[str, float] = baseline.get("input_type_distribution", {}) or {}
     if type_distribution and telemetry.indicator_type not in type_distribution:

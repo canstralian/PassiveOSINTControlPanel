@@ -268,6 +268,23 @@ def test_policy_violation_with_none_code_and_message_is_normalized(
     assert signal.reason == "Policy violation detected"
 
 
+def test_assess_drift_tolerates_none_baseline_and_policy_result(
+    telemetry: TelemetrySnapshot,
+) -> None:
+    # assess_drift advertises Optional baseline/policy_result; passing None must
+    # return a clean OBSERVE assessment rather than raising AttributeError.
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=None,
+        policy_result=None,
+    )
+
+    assert assessment.drift_vector == DriftVector()
+    assert assessment.signals == []
+    assert assessment.dominant_type is None
+    assert assessment.recommended_correction == "OBSERVE"
+
+
 def test_authorization_gate_trigger_creates_policy_signal(
     baseline: dict[str, Any],
 ) -> None:
