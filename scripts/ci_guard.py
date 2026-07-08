@@ -436,7 +436,7 @@ def check_passive_first(root: Path) -> list[Finding]:
         try:
             tree = ast.parse(source, filename=path.as_posix())
         except SyntaxError as exc:
-            if path.as_posix() in PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST:
+            if path_in(path, PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST):
                 continue
             findings.append(
                 Finding(

@@ -25,6 +25,8 @@ import pytest
 
 from osint_core.drift import (
     DriftAssessment,
+    DriftError,
+    DriftErrorCode,
     DriftSignal,
     DriftType,
     DriftVector,
@@ -283,6 +285,22 @@ def test_assess_drift_tolerates_none_baseline_and_policy_result(
     assert assessment.signals == []
     assert assessment.dominant_type is None
     assert assessment.recommended_correction == "OBSERVE"
+
+
+def test_assess_drift_raises_structured_error_on_none_telemetry(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    # The telemetry enforcement boundary must raise a structured DriftError with
+    # an error code, not a bare ValueError.
+    with pytest.raises(DriftError) as exc_info:
+        assess_drift(
+            telemetry=None,  # type: ignore[arg-type]
+            baseline=baseline,
+            policy_result=policy_result,
+        )
+
+    assert exc_info.value.code == DriftErrorCode.MISSING_TELEMETRY
 
 
 def test_authorization_gate_trigger_creates_policy_signal(

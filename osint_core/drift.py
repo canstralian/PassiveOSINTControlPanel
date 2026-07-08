@@ -59,6 +59,26 @@ CorrectionVerb = Literal["ADAPT", "CONSTRAIN", "REVERT", "OBSERVE"]
 Tier = Literal["T1", "T2", "T3", "T4"]
 
 
+class DriftErrorCode(str, Enum):
+    """Error codes for drift enforcement failures."""
+
+    MISSING_TELEMETRY = "missing_telemetry"
+
+
+class DriftError(Exception):
+    """
+    Raised at drift enforcement boundaries (e.g. missing telemetry).
+
+    Mirrors the structured-exception convention used by ValidationErrorCode /
+    PolicyErrorCode so callers can branch on ``code`` rather than message text.
+    """
+
+    def __init__(self, code: DriftErrorCode, message: str) -> None:
+        self.code = code
+        self.message = message
+        super().__init__(f"{code.value}: {message}")
+
+
 class DriftType(str, Enum):
     """The six drift classes, ordered by correction priority in code below."""
 
@@ -508,7 +528,7 @@ def assess_drift(
     chosen from the aggregated vector.
     """
     if telemetry is None:
-        raise ValueError("telemetry cannot be None")
+        raise DriftError(DriftErrorCode.MISSING_TELEMETRY, "telemetry cannot be None")
     signals: list[DriftSignal] = []
     signals += _check_policy_drift(policy_result)
     signals += _check_structural_drift(telemetry, baseline)
