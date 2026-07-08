@@ -487,8 +487,8 @@ def estimate_confidence(signals: list[DriftSignal]) -> float:
 
 def assess_drift(
     telemetry: TelemetrySnapshot,
-    baseline: Mapping[str, Any],
-    policy_result: Mapping[str, Any],
+    baseline: Mapping[str, Any] | None,
+    policy_result: Mapping[str, Any] | None,
 ) -> DriftAssessment:
     """
     Assess drift for a single run. Pure: does not mutate any input.
@@ -497,6 +497,8 @@ def assess_drift(
     the result — aggregation takes the max score per class and correction is
     chosen from the aggregated vector.
     """
+    if telemetry is None:
+        raise ValueError("telemetry cannot be None")
     signals: list[DriftSignal] = []
     signals += _check_policy_drift(policy_result)
     signals += _check_structural_drift(telemetry, baseline)
