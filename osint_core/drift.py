@@ -201,7 +201,9 @@ def _check_policy_drift(policy_result: Mapping[str, Any]) -> list[DriftSignal]:
 
 
 def _check_adversarial_drift(telemetry: TelemetrySnapshot) -> list[DriftSignal]:
-    haystack = f"{telemetry.rejection_reason}\n{telemetry.sanitized_input_trace}"
+    rejection_reason = telemetry.rejection_reason or ""
+    sanitized_input_trace = telemetry.sanitized_input_trace or ""
+    haystack = f"{rejection_reason}\n{sanitized_input_trace}"
     if not haystack.strip():
         return []
 
