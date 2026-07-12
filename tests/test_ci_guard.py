@@ -220,13 +220,38 @@ def test_passive_first_ignores_non_requests_calls(fake_repo: Path) -> None:
     assert findings == []
 
 
-def test_passive_first_skips_pseudocode_allowlist(fake_repo: Path) -> None:
-    # drift.py is documented pseudocode; the rule must not blow up on it.
-    (fake_repo / "osint_core" / "drift.py").write_text(
+def test_passive_first_skips_pseudocode_allowlist(
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A file on the pseudocode allowlist is exempt from the syntax-error
+    # sub-check. drift.py is now real Python and the default allowlist is empty,
+    # so exercise the mechanism with a synthetic allowlisted file.
+    (fake_repo / "osint_core" / "legacy_spec.py").write_text(
         "DEFINE foo AS bar\nFUNCTION baz()\n",
+    )
+    monkeypatch.setattr(
+        ci_guard,
+        "PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST",
+        ("osint_core/legacy_spec.py",),
     )
     findings = ci_guard.check_passive_first(fake_repo)
     assert findings == []
+
+
+def test_passive_first_reports_syntax_error_when_not_allowlisted(
+    fake_repo: Path,
+) -> None:
+    # With the default (empty) allowlist, pseudocode in osint_core/ must be
+    # reported rather than silently skipped.
+    (fake_repo / "osint_core" / "legacy_spec.py").write_text(
+        "DEFINE foo AS bar\nFUNCTION baz()\n",
+    )
+    findings = ci_guard.check_passive_first(fake_repo)
+    assert any(
+        f.rule == "passive_first"
+        and f.path.as_posix() == "osint_core/legacy_spec.py"
+        for f in findings
+    )
 
 
 def test_passive_first_reports_real_syntax_error(fake_repo: Path) -> None:

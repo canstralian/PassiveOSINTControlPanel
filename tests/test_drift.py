@@ -25,6 +25,8 @@ import pytest
 
 from osint_core.drift import (
     DriftAssessment,
+    DriftError,
+    DriftErrorCode,
     DriftSignal,
     DriftType,
     DriftVector,
@@ -241,6 +243,64 @@ def test_policy_violation_creates_policy_signal_and_revert_recommendation(
     assert assessment.dominant_type == DriftType.POLICY
     assert assessment.recommended_correction == "REVERT"
     assert any(signal.drift_type == DriftType.POLICY for signal in assessment.signals)
+
+
+def test_policy_violation_with_none_code_and_message_is_normalized(
+    telemetry: TelemetrySnapshot,
+    baseline: dict[str, Any],
+) -> None:
+    # A violation may carry an explicit None code/message; the signal name must
+    # fall back to "unknown" and reason must stay a str (not the literal "None").
+    policy_result = make_policy_result(
+        decision="constrain",
+        violations=[{"code": None, "message": None, "module": "port_scan"}],
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    policy_signals = [s for s in assessment.signals if s.drift_type == DriftType.POLICY]
+    assert len(policy_signals) == 1
+    signal = policy_signals[0]
+    assert signal.name == "policy_violation:unknown"
+    assert isinstance(signal.reason, str)
+    assert signal.reason == "Policy violation detected"
+
+
+def test_assess_drift_tolerates_none_baseline_and_policy_result(
+    telemetry: TelemetrySnapshot,
+) -> None:
+    # assess_drift advertises Optional baseline/policy_result; passing None must
+    # return a clean OBSERVE assessment rather than raising AttributeError.
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=None,
+        policy_result=None,
+    )
+
+    assert assessment.drift_vector == DriftVector()
+    assert assessment.signals == []
+    assert assessment.dominant_type is None
+    assert assessment.recommended_correction == "OBSERVE"
+
+
+def test_assess_drift_raises_structured_error_on_none_telemetry(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    # The telemetry enforcement boundary must raise a structured DriftError with
+    # an error code, not a bare ValueError.
+    with pytest.raises(DriftError) as exc_info:
+        assess_drift(
+            telemetry=None,  # type: ignore[arg-type]
+            baseline=baseline,
+            policy_result=policy_result,
+        )
+
+    assert exc_info.value.code == DriftErrorCode.MISSING_TELEMETRY
 
 
 def test_authorization_gate_trigger_creates_policy_signal(
