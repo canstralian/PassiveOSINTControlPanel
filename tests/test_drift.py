@@ -669,3 +669,356 @@ def test_clean_execution_observes_without_significant_drift(
     assert assessment.dominant_type is None
     assert assessment.recommended_correction == "OBSERVE"
     assert assessment.confidence == pytest.approx(0.0)
+
+
+# =============================================================================
+# Additional coverage: policy violation normalization edge cases
+# =============================================================================
+
+
+def test_policy_violation_with_code_present_message_none_falls_back_reason(
+    telemetry: TelemetrySnapshot,
+    baseline: dict[str, Any],
+) -> None:
+    # A violation may have a real code but no message; the name must use the
+    # code and the reason must still fall back to the default string.
+    policy_result = make_policy_result(
+        decision="constrain",
+        violations=[{"code": "custom_code", "message": None, "module": "x"}],
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    policy_signals = [s for s in assessment.signals if s.drift_type == DriftType.POLICY]
+    assert len(policy_signals) == 1
+    signal = policy_signals[0]
+    assert signal.name == "policy_violation:custom_code"
+    assert signal.reason == "Policy violation detected"
+    # "custom_code" is not in the known score table, so it takes the default.
+    assert signal.score == pytest.approx(0.8)
+
+
+def test_policy_violation_non_mapping_entry_uses_defaults(
+    telemetry: TelemetrySnapshot,
+    baseline: dict[str, Any],
+) -> None:
+    # A violation entry that is not a mapping (e.g. a bare string) must not
+    # raise; it is treated as an unknown, default-scored violation.
+    policy_result = make_policy_result(
+        decision="constrain",
+        violations=["just-a-string"],
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    policy_signals = [s for s in assessment.signals if s.drift_type == DriftType.POLICY]
+    assert len(policy_signals) == 1
+    signal = policy_signals[0]
+    assert signal.name == "policy_violation:unknown"
+    assert signal.score == pytest.approx(0.8)
+    assert signal.evidence == {"violation": "just-a-string"}
+
+
+def test_policy_violation_authorization_required_uses_exact_table_score(
+    telemetry: TelemetrySnapshot,
+    baseline: dict[str, Any],
+) -> None:
+    policy_result = make_policy_result(
+        decision="constrain",
+        violations=[
+            {"code": "authorization_required", "message": "auth needed", "module": "x"}
+        ],
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    policy_signals = [s for s in assessment.signals if s.drift_type == DriftType.POLICY]
+    assert policy_signals[0].score == pytest.approx(0.6)
+
+
+def test_policy_violation_forbidden_module_uses_exact_table_score(
+    telemetry: TelemetrySnapshot,
+    baseline: dict[str, Any],
+) -> None:
+    policy_result = make_policy_result(
+        decision="constrain",
+        violations=[
+            {"code": "forbidden_module", "message": "blocked", "module": "port_scan"}
+        ],
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    policy_signals = [s for s in assessment.signals if s.drift_type == DriftType.POLICY]
+    assert policy_signals[0].score == pytest.approx(1.0)
+
+
+# =============================================================================
+# Additional coverage: adversarial pattern anchoring
+# =============================================================================
+
+
+@pytest.mark.parametrize(
+    ("trace", "expected_pattern"),
+    [
+        ("../../etc/passwd", "path_traversal"),
+        ("%2E%2E%2F", "path_traversal_encoded"),
+        ("http://169.254.169.254/latest/meta-data", "ssrf_metadata_ip"),
+        ("connect to 127.0.0.1 directly", "loopback_ip"),
+        ("http://localhost:8080/admin", "loopback_host"),
+        ("<script>alert(1)</script>", "script_injection"),
+        ("javascript:alert(1)", "javascript_scheme"),
+        ("file:///etc/passwd", "file_scheme"),
+        ("$(rm -rf /)", "command_substitution"),
+    ],
+)
+def test_adversarial_pattern_matches_expected_signal(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+    trace: str,
+    expected_pattern: str,
+) -> None:
+    telemetry = make_telemetry(
+        input_rejected=True,
+        rejection_reason="Input contains a blocked pattern.",
+        sanitized_input_trace=trace,
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    assert any(
+        s.drift_type == DriftType.ADVERSARIAL and s.evidence.get("pattern") == expected_pattern
+        for s in assessment.signals
+    )
+
+
+def test_adversarial_file_scheme_pattern_does_not_fire_inside_profile(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    # "profile:" contains the substring "file:" but must not match because
+    # there is no word boundary between "pro" and "file:".
+    telemetry = make_telemetry(
+        input_rejected=False,
+        rejection_reason="",
+        sanitized_input_trace="user profile: settings updated",
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    assert assessment.drift_vector.adversarial == 0.0
+    assert not any(s.drift_type == DriftType.ADVERSARIAL for s in assessment.signals)
+
+
+def test_adversarial_localhost_pattern_does_not_fire_inside_notlocalhost(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    telemetry = make_telemetry(
+        input_rejected=False,
+        rejection_reason="",
+        sanitized_input_trace="target host is notlocalhost.example",
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    assert assessment.drift_vector.adversarial == 0.0
+    assert not any(s.drift_type == DriftType.ADVERSARIAL for s in assessment.signals)
+
+
+def test_adversarial_multiple_patterns_each_produce_a_distinct_signal(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    telemetry = make_telemetry(
+        input_rejected=True,
+        rejection_reason="Input contains a blocked pattern.",
+        sanitized_input_trace="../../etc/passwd and <script>alert(1)</script>",
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    adversarial_signals = [s for s in assessment.signals if s.drift_type == DriftType.ADVERSARIAL]
+    matched_patterns = {s.evidence.get("pattern") for s in adversarial_signals}
+    assert {"path_traversal", "script_injection"}.issubset(matched_patterns)
+    # Aggregation still takes the max score across all matching signals.
+    assert assessment.drift_vector.adversarial == 0.7
+
+
+def test_adversarial_shell_metacharacters_are_intentionally_not_flagged(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    # The module docstring documents that bare ";" "|" "`" are excluded as
+    # too noisy for benign OSINT input; this pins that design decision.
+    telemetry = make_telemetry(
+        input_rejected=False,
+        rejection_reason="",
+        sanitized_input_trace="query;another|value`backtick`",
+    )
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    assert assessment.drift_vector.adversarial == 0.0
+
+
+# =============================================================================
+# Additional coverage: statistical detectors with partial baselines
+# =============================================================================
+
+
+def test_statistical_no_signal_when_module_usage_distribution_is_empty(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    telemetry = make_telemetry(modules_executed=["resource_links", "brand_new_module"])
+    baseline = make_baseline(module_usage_distribution={})
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    assert assessment.drift_vector.statistical == 0.0
+
+
+def test_statistical_no_signal_when_input_type_distribution_is_empty(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    telemetry = make_telemetry(indicator_type="ip")
+    baseline = make_baseline(input_type_distribution={})
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    assert assessment.drift_vector.statistical == 0.0
+
+
+# =============================================================================
+# Additional coverage: operational detectors tolerate partial baselines
+# =============================================================================
+
+
+def test_operational_partial_baseline_skips_only_missing_thresholds(
+    baseline: dict[str, Any],
+    policy_result: dict[str, Any],
+) -> None:
+    telemetry = make_telemetry(timeout_count=5)
+    baseline = make_baseline()
+    del baseline["timeout_threshold"]
+
+    assessment = assess_drift(
+        telemetry=telemetry,
+        baseline=baseline,
+        policy_result=policy_result,
+    )
+
+    # No timeout_threshold in baseline means the timeout check is skipped
+    # entirely, regardless of how high timeout_count is.
+    assert not any(s.name == "timeout_threshold_exceeded" for s in assessment.signals)
+    assert assessment.drift_vector.operational == 0.0
+
+
+# =============================================================================
+# Additional coverage: recommend_correction's plain-mapping tolerance
+# =============================================================================
+
+
+def test_recommend_correction_accepts_plain_mapping_missing_keys() -> None:
+    # Orchestrator carries a dict drift vector; a mapping missing some
+    # classes must be treated as zero drift for those classes.
+    assert recommend_correction({"statistical": 0.6}) == "ADAPT"
+
+
+def test_recommend_correction_coerces_numeric_strings() -> None:
+    assert recommend_correction({"statistical": "0.6"}) == "ADAPT"
+
+
+def test_recommend_correction_treats_non_numeric_and_none_values_as_zero() -> None:
+    vector = {
+        "policy": None,
+        "structural": "not-a-number",
+        "behavioral": None,
+        "adversarial": None,
+        "operational": None,
+        "statistical": None,
+    }
+    assert recommend_correction(vector) == "OBSERVE"
+
+
+# =============================================================================
+# Additional coverage: DriftVector.component and confidence bounds
+# =============================================================================
+
+
+def test_drift_vector_component_reads_matching_attribute() -> None:
+    vector = DriftVector(policy=0.6, structural=0.2)
+    assert vector.component(DriftType.POLICY) == pytest.approx(0.6)
+    assert vector.component(DriftType.STRUCTURAL) == pytest.approx(0.2)
+    assert vector.component(DriftType.BEHAVIORAL) == pytest.approx(0.0)
+
+
+def test_estimate_confidence_never_reaches_one_even_with_many_strong_signals() -> None:
+    strong_signal = DriftSignal(
+        name="strong",
+        drift_type=DriftType.POLICY,
+        score=1.0,
+        reason="forbidden module",
+        tier="T1",
+        evidence={},
+    )
+    confidence = estimate_confidence([strong_signal] * 5)
+    assert confidence < 1.0
+
+
+# =============================================================================
+# Additional coverage: DriftError formatting
+# =============================================================================
+
+
+def test_drift_error_str_includes_code_and_message() -> None:
+    error = DriftError(DriftErrorCode.MISSING_TELEMETRY, "telemetry cannot be None")
+    assert error.code == DriftErrorCode.MISSING_TELEMETRY
+    assert error.message == "telemetry cannot be None"
+    assert str(error) == "missing_telemetry: telemetry cannot be None"
