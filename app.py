@@ -414,6 +414,9 @@ def resolve_dns(domain: str) -> dict[str, Any]:
     """
     result: dict[str, Any] = {"A": [], "AAAA": [], "MX": [], "NS": []}
 
+    # Restore the process-global default timeout afterwards so a lookup here
+    # does not silently change socket behaviour elsewhere in the Gradio app.
+    old_timeout = socket.getdefaulttimeout()
     try:
         socket.setdefaulttimeout(NETWORK_TIMEOUT_SECONDS)
         for family, key in ((socket.AF_INET, "A"), (socket.AF_INET6, "AAAA")):
@@ -424,6 +427,8 @@ def resolve_dns(domain: str) -> dict[str, Any]:
                 result[key] = []
     except Exception as exc:
         result["error"] = str(exc)
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
     return result
 
@@ -500,7 +505,10 @@ def detect_drift(
         drift["adversarial"] = 0.7
 
     if modules_blocked:
-        drift["policy"] = 0.4
+        # A blocked module is a policy boundary hit. Scored on the canonical
+        # (revert-class) scale used by osint_core.drift.recommend_correction,
+        # matching the orchestrator rather than an ad-hoc 0.4.
+        drift["policy"] = 0.6
 
     if errors:
         drift["operational"] = min(0.2 * len(errors), 1.0)
@@ -766,6 +774,10 @@ def export_audit_index() -> str | None:
             )
         except Exception:
             continue
+
+    if not rows:
+        # Audit files existed but none parsed; nothing to index.
+        return None
 
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
