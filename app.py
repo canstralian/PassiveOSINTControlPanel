@@ -317,7 +317,9 @@ def classify_and_normalize(raw_value: str, forced_type: str = "Auto") -> tuple[I
     parsed = urlparse(candidate)
     if parsed.scheme in {"http", "https"} and parsed.netloc:
         host = parsed.netloc.lower()
-        return "url", f"{parsed.scheme.lower()}://{host}{parsed.path or ''}"
+        query_part = f"?{parsed.query}" if parsed.query else ""
+        fragment_part = f"#{parsed.fragment}" if parsed.fragment else ""
+        return "url", f"{parsed.scheme.lower()}://{host}{parsed.path or ''}{query_part}{fragment_part}"
 
     # IP
     try:
@@ -371,7 +373,9 @@ def validate_as_type(candidate: str, wanted: str) -> tuple[IndicatorType, str]:
     if wanted == "url":
         parsed = urlparse(candidate)
         if parsed.scheme in {"http", "https"} and parsed.netloc:
-            return "url", f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path or ''}"
+            query_part = f"?{parsed.query}" if parsed.query else ""
+            fragment_part = f"#{parsed.fragment}" if parsed.fragment else ""
+            return "url", f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path or ''}{query_part}{fragment_part}"
         raise ValueError("Invalid URL. Only http:// and https:// are supported.")
 
     raise ValueError("Unknown indicator type.")
