@@ -127,6 +127,55 @@ def test_forbidden_tools_word_boundary_avoids_false_positive(
     assert findings == []
 
 
+def test_forbidden_tools_allows_passive_scope_rules_yaml(fake_repo: Path) -> None:
+    # policy/passive_scope_rules.yaml is now on the allowlist because it
+    # declares nmap/masscan in the forbidden deny list.
+    (fake_repo / "policy").mkdir()
+    (fake_repo / "policy" / "passive_scope_rules.yaml").write_text(
+        "forbidden:\n  - nmap\n  - masscan\n",
+    )
+    findings = ci_guard.check_forbidden_tools(fake_repo)
+    assert findings == []
+
+
+def test_forbidden_tools_allows_expanded_test_allowlist_entries(
+    fake_repo: Path,
+) -> None:
+    # Each of these test files was newly added to the allowlist because they
+    # feed a forbidden tool name in as *input* to assert the passive-first
+    # gate rejects or remaps it.
+    (fake_repo / "tests").mkdir()
+    for name in (
+        "test_adaptation.py",
+        "test_audit.py",
+        "test_constraint_ledger.py",
+        "test_constraints.py",
+        "test_enrichment.py",
+        "test_invention_loop.py",
+        "test_passive_boundaries.py",
+    ):
+        (fake_repo / "tests" / name).write_text('BLOCKED_MODULE = "nmap"\n')
+
+    findings = ci_guard.check_forbidden_tools(fake_repo)
+    assert findings == []
+
+
+def test_forbidden_tools_new_test_file_not_on_allowlist_is_still_flagged(
+    fake_repo: Path,
+) -> None:
+    # The allowlist is an explicit per-file enumeration on purpose: a test
+    # file that is NOT enumerated must still be caught by the rule.
+    (fake_repo / "tests").mkdir()
+    (fake_repo / "tests" / "test_something_new.py").write_text(
+        'BLOCKED_MODULE = "nmap"\n',
+    )
+    findings = ci_guard.check_forbidden_tools(fake_repo)
+    assert any(
+        f.rule == "forbidden_tools" and f.path.as_posix() == "tests/test_something_new.py"
+        for f in findings
+    )
+
+
 # ---------- raw_indicator_leakage ----------
 
 
@@ -252,6 +301,43 @@ def test_passive_first_reports_syntax_error_when_not_allowlisted(
         and f.path.as_posix() == "osint_core/legacy_spec.py"
         for f in findings
     )
+
+
+def test_passive_first_pseudocode_allowlist_defaults_to_empty() -> None:
+    # osint_core/drift.py is now real Python and must parse; the default
+    # allowlist must no longer carve out any exemption.
+    assert ci_guard.PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST == ()
+
+
+def test_passive_first_pseudocode_allowlist_supports_directory_prefix(
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # check_passive_first now uses path_in() (prefix-aware) rather than an
+    # exact-match membership test, so a directory-style allowlist entry
+    # (trailing "/") must exempt every file underneath it.
+    (fake_repo / "osint_core" / "legacy").mkdir()
+    (fake_repo / "osint_core" / "legacy" / "spec_a.py").write_text(
+        "DEFINE foo AS bar\n",
+    )
+    (fake_repo / "osint_core" / "legacy" / "spec_b.py").write_text(
+        "FUNCTION baz(\n",
+    )
+    monkeypatch.setattr(
+        ci_guard,
+        "PASSIVE_FIRST_PSEUDOCODE_ALLOWLIST",
+        ("osint_core/legacy/",),
+    )
+    findings = ci_guard.check_passive_first(fake_repo)
+    assert findings == []
+
+
+def test_passive_first_real_drift_module_parses_without_syntax_error() -> None:
+    # Regression guard for the exact change in this PR: osint_core/drift.py
+    # was rewritten from pseudocode to real Python and removed from the
+    # allowlist. It must parse cleanly and must not appear in the findings
+    # for the passive_first rule against the actual repository.
+    findings = ci_guard.check_passive_first(ci_guard.REPO_ROOT)
+    assert not any(f.path.as_posix() == "osint_core/drift.py" for f in findings)
 
 
 def test_passive_first_reports_real_syntax_error(fake_repo: Path) -> None:

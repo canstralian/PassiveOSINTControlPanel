@@ -4,15 +4,17 @@ Tests for osint_core.orchestrator module
 
 import pytest
 
+from osint_core import drift as drift_module
 from osint_core.orchestrator import (
     OrchestratorAgent,
     ExecutionStatus,
     create_orchestrator,
     list_skills,
     get_skill,
+    recommend_correction,
     SKILLS_REGISTRY,
 )
-from osint_core.policy import PolicyDecision
+from osint_core.policy import PolicyDecision, PolicyEvaluation
 
 
 def test_create_orchestrator():
@@ -284,3 +286,104 @@ def test_multiple_modules_execution():
     assert len(workflow.skill_results) == 2
     completed = [r for r in workflow.skill_results if r.status == ExecutionStatus.COMPLETED]
     assert len(completed) == 2
+
+
+# =============================================================================
+# Drift / correction: regression coverage for delegation to osint_core.drift
+# =============================================================================
+
+
+def test_orchestrator_recommend_correction_is_the_drift_module_function():
+    # The orchestrator must not maintain a parallel implementation; it
+    # imports and reuses the single source of truth in osint_core.drift.
+    assert recommend_correction is drift_module.recommend_correction
+
+
+def test_detect_drift_policy_score_is_revert_threshold_when_modules_blocked():
+    """
+    Policy drift from a blocked module must be scored at the REVERT
+    threshold (0.6), not the old ad-hoc CONSTRAIN-level value (0.4).
+    """
+    agent = create_orchestrator()
+    context = agent.create_context(
+        raw_indicator="example.com",
+        indicator_type_hint="Domain",
+        requested_modules=["http_headers"],
+        authorized_target=False,
+        passive_only=True,
+    )
+    policy_eval = PolicyEvaluation(
+        decision=PolicyDecision.CONSTRAIN,
+        allowed_modules=[],
+        blocked_modules=["http_headers"],
+        violations=[],
+    )
+
+    drift_vector = agent._detect_drift(context, skill_results=[], policy_eval=policy_eval)
+
+    assert drift_vector["policy"] == pytest.approx(0.6)
+
+
+def test_detect_drift_policy_score_is_zero_when_nothing_blocked():
+    agent = create_orchestrator()
+    context = agent.create_context(
+        raw_indicator="example.com",
+        indicator_type_hint="Domain",
+        requested_modules=["resource_links"],
+        authorized_target=False,
+        passive_only=True,
+    )
+    policy_eval = PolicyEvaluation(
+        decision=PolicyDecision.ALLOW,
+        allowed_modules=["resource_links"],
+        blocked_modules=[],
+        violations=[],
+    )
+
+    drift_vector = agent._detect_drift(context, skill_results=[], policy_eval=policy_eval)
+
+    assert drift_vector["policy"] == 0.0
+
+
+def test_choose_correction_delegates_to_drift_recommend_correction():
+    """
+    _choose_correction must take only the drift vector (no policy_eval) and
+    produce exactly what osint_core.drift.recommend_correction would.
+    """
+    agent = create_orchestrator()
+    vectors = [
+        {"policy": 0.6, "structural": 0.0, "behavioral": 0.0, "adversarial": 0.0, "operational": 0.0, "statistical": 0.0},
+        {"policy": 0.0, "structural": 0.0, "behavioral": 0.0, "adversarial": 0.3, "operational": 0.0, "statistical": 0.9},
+        {"policy": 0.0, "structural": 0.0, "behavioral": 0.0, "adversarial": 0.0, "operational": 0.0, "statistical": 0.5},
+        {"policy": 0.0, "structural": 0.0, "behavioral": 0.0, "adversarial": 0.0, "operational": 0.0, "statistical": 0.0},
+    ]
+    for vector in vectors:
+        assert agent._choose_correction(vector) == recommend_correction(vector)
+
+
+def test_choose_correction_takes_single_argument_only():
+    # Regression: the old signature accepted (drift_vector, policy_eval);
+    # the new one takes only drift_vector.
+    agent = create_orchestrator()
+    assert agent._choose_correction({"policy": 0.6}) == "REVERT"
+
+
+def test_workflow_policy_violation_now_reverts_instead_of_constrains():
+    """
+    Before this change, a blocked module scored policy drift at 0.4 and
+    _choose_correction mapped policy >= 0.4 to CONSTRAIN. Now policy drift
+    from a blocked module is scored at 0.6, which crosses the REVERT
+    threshold in osint_core.drift.recommend_correction.
+    """
+    agent = create_orchestrator()
+    workflow = agent.execute_workflow(
+        raw_indicator="example.com",
+        indicator_type_hint="Domain",
+        requested_modules=["http_headers"],  # requires auth
+        authorized_target=False,  # not authorized -> blocked
+        passive_only=True,
+    )
+
+    assert workflow.policy_evaluation.blocked_modules == ["http_headers"]
+    assert workflow.drift_vector["policy"] == pytest.approx(0.6)
+    assert workflow.correction_verb == "REVERT"
