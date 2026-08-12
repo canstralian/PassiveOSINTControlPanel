@@ -20,7 +20,7 @@ import type {
   Evidence,
   Hypothesis,
   ObservationModel,
-  ValidationResult,
+  ValidationFailure,
 } from "../domain/types.js";
 
 export const CODE_VERSION = "0.0.1";
@@ -44,7 +44,7 @@ export type UpdateOutcome =
     }
   | {
       ok: false;
-      validation: ValidationResult;
+      validation: ValidationFailure;
     };
 
 export class BeliefGraphUpdater {
@@ -87,6 +87,16 @@ export class BeliefGraphUpdater {
     }
 
     const priorBefore = req.prevBelief?.posterior ?? req.hypothesis.prior;
+    if (!Number.isFinite(priorBefore) || priorBefore < 0 || priorBefore > 1) {
+      return {
+        ok: false,
+        validation: {
+          ok: false,
+          errorCode: "result_invalid",
+          message: "prior out of range",
+        },
+      };
+    }
 
     // Correlated-evidence dedup: if this evidence's correlation group has
     // already been incorporated (by id or by group), reject the update.

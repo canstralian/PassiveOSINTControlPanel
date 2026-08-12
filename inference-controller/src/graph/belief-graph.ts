@@ -64,6 +64,11 @@ export class BeliefGraph {
     if (!this.hypotheses.has(h.id)) {
       throw new GraphValidationError(`unknown hypothesis: ${h.id}`);
     }
+    if (h.assumptionContextId && !this.contexts.has(h.assumptionContextId)) {
+      throw new GraphValidationError(
+        `hypothesis references unknown context: ${h.assumptionContextId}`
+      );
+    }
     this.hypotheses.set(h.id, h);
   }
 
@@ -164,7 +169,40 @@ export class BeliefGraph {
     if (this.edges.has(edge.id)) {
       throw new GraphValidationError(`duplicate edge id: ${edge.id}`);
     }
+    if (!this.hasNode(edge.fromKind, edge.fromId)) {
+      throw new GraphValidationError(
+        `edge ${edge.id} references unknown from-node: ${edge.fromKind}:${edge.fromId}`
+      );
+    }
+    if (!this.hasNode(edge.toKind, edge.toId)) {
+      throw new GraphValidationError(
+        `edge ${edge.id} references unknown to-node: ${edge.toKind}:${edge.toId}`
+      );
+    }
     this.edges.set(edge.id, edge);
+  }
+
+  private hasNode(kind: GraphEdge["fromKind"], id: string): boolean {
+    switch (kind) {
+      case "hypothesis":
+        return this.hypotheses.has(id);
+      case "evidence":
+        return this.evidence.has(id);
+      case "contradiction":
+        return this.contradictions.has(id);
+      case "context":
+        return this.contexts.has(id);
+      case "merge":
+        // Merge identifiers are external to the graph store. Edges to merges
+        // are validated against a separate merge service if used.
+        return true;
+      default: {
+        // Compile-time exhaustiveness check: if a new fromKind is added to
+        // GraphEdge, TypeScript will refuse to compile this assignment.
+        const _exhaustive: never = kind;
+        throw new Error(`unhandled node kind: ${String(_exhaustive)}`);
+      }
+    }
   }
 
   edgesFrom(fromId: string): readonly GraphEdge[] {
@@ -178,6 +216,7 @@ export class BeliefGraph {
     evidence: Evidence[];
     contradictions: Contradiction[];
     contexts: AssumptionContext[];
+    observationModels: ObservationModel[];
     beliefs: BeliefState[];
     edges: GraphEdge[];
   } {
@@ -186,6 +225,9 @@ export class BeliefGraph {
       evidence: structuredClone(Array.from(this.evidence.values())),
       contradictions: structuredClone(Array.from(this.contradictions.values())),
       contexts: structuredClone(Array.from(this.contexts.values())),
+      observationModels: structuredClone(
+        Array.from(this.observationModels.values())
+      ),
       beliefs: structuredClone(Array.from(this.beliefs.values())),
       edges: structuredClone(Array.from(this.edges.values())),
     };

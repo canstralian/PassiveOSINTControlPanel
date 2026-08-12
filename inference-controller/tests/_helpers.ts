@@ -50,7 +50,7 @@ export function makeInvestigation(overrides: Partial<Investigation> = {}): Inves
 export function makeHypothesis(overrides: Partial<Hypothesis> = {}): Hypothesis {
   return {
     id: newHypothesisId(),
-    investigationId: "inv_test",
+    investigationId: newInvestigationId(),
     statement: "the suspect controls target.example",
     lifecycle: "active",
     prior: 0.3,
@@ -76,12 +76,12 @@ export function makeProvenance(overrides: Partial<Provenance> = {}): Provenance 
 export function makeEvidence(overrides: Partial<Evidence> = {}): Evidence {
   return {
     id: newEvidenceId(),
-    investigationId: "inv_test",
+    investigationId: newInvestigationId(),
     observedAt: new Date(0).toISOString(),
     provenance: makeProvenance(),
     observationType: "primary_record",
     observedValue: { signal: 1 },
-    affects: [{ hypothesisId: "hyp_test", polarityHint: "supports" }],
+    affects: [{ hypothesisId: newHypothesisId(), polarityHint: "supports" }],
     ...overrides,
   };
 }
@@ -101,7 +101,7 @@ export function makeObservationModel(
 export function makeAction(overrides: Partial<CandidateAction> = {}): CandidateAction {
   return {
     id: newActionId(),
-    investigationId: "inv_test",
+    investigationId: newInvestigationId(),
     kind: "inference",
     description: "infer",
     targets: [],

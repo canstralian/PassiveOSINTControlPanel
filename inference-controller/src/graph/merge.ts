@@ -86,6 +86,7 @@ export class MergeService {
     const m = this.merges.get(mergeId);
     if (!m) throw new Error(`unknown merge: ${mergeId}`);
     if (!approved) throw new Error("finalize requires approval");
+    if (m.reversedAt) throw new Error("cannot finalize a reverted merge");
     if (m.finalized) return m;
     const next: MergeRecord = { ...m, finalized: true, finalizedAt: now.toISOString() };
     this.merges.set(mergeId, next);

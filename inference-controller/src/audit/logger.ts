@@ -67,6 +67,12 @@ export type AuditPayload = Omit<AuditEvent, "id" | "timestamp" | "integrityMarke
 export class AuditLogger {
   private _failClosed = false;
   private _lastIntegrityMarker = "GENESIS";
+  private _initialized: Promise<void> | undefined;
+  // Serializes concurrent record() calls so the read-of-marker /
+  // sink.write / write-back-marker sequence is atomic. Without this,
+  // two concurrent records would chain off the same previous marker
+  // and break the hash chain.
+  private _writeQueue: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly sink: AuditSink) {}
 
@@ -75,37 +81,70 @@ export class AuditLogger {
   }
 
   /**
+   * Lazily rehydrate the last integrity marker from the sink. Without this,
+   * a fresh AuditLogger over a non-empty sink would fork the hash chain.
+   * A failure to read is treated as a fail-closed event because we cannot
+   * extend the chain safely.
+   */
+  private async initialize(): Promise<void> {
+    if (!this._initialized) {
+      this._initialized = (async () => {
+        try {
+          const events = await this.sink.read();
+          const last = events.length > 0 ? events[events.length - 1] : undefined;
+          if (last) this._lastIntegrityMarker = last.integrityMarker;
+        } catch (err) {
+          this._failClosed = true;
+          throw err;
+        }
+      })();
+    }
+    await this._initialized;
+  }
+
+  /**
    * Write an audit event. Returns the persisted event. Throws and enters
    * fail-closed mode if the sink rejects the write.
+   *
+   * Calls are serialized via _writeQueue so the read of
+   * `_lastIntegrityMarker`, the sink write, and the marker write-back
+   * happen atomically with respect to other concurrent calls.
    */
   async record(payload: AuditPayload, now: Date = new Date()): Promise<AuditEvent> {
-    if (this._failClosed) {
-      throw new Error("AuditLogger is in fail-closed mode");
-    }
-    const id = newAuditEventId();
-    const timestamp = now.toISOString();
-    const integrityMarker = this.computeIntegrityMarker(
-      this._lastIntegrityMarker,
-      id,
-      timestamp,
-      payload
-    );
-    const event: AuditEvent = {
-      ...payload,
-      id,
-      timestamp,
-      integrityMarker,
-    };
-    const parsed = AuditEventSchema.parse(event);
-    try {
-      await this.sink.write(parsed);
-    } catch (err) {
-      // Per spec point 3: audit failure -> fail closed.
-      this._failClosed = true;
-      throw err;
-    }
-    this._lastIntegrityMarker = integrityMarker;
-    return parsed;
+    const next = this._writeQueue.then(async () => {
+      await this.initialize();
+      if (this._failClosed) {
+        throw new Error("AuditLogger is in fail-closed mode");
+      }
+      const id = newAuditEventId();
+      const timestamp = now.toISOString();
+      const integrityMarker = this.computeIntegrityMarker(
+        this._lastIntegrityMarker,
+        id,
+        timestamp,
+        payload
+      );
+      const event: AuditEvent = {
+        ...payload,
+        id,
+        timestamp,
+        integrityMarker,
+      };
+      const parsed = AuditEventSchema.parse(event);
+      try {
+        await this.sink.write(parsed);
+      } catch (err) {
+        // Per spec point 3: audit failure -> fail closed.
+        this._failClosed = true;
+        throw err;
+      }
+      this._lastIntegrityMarker = integrityMarker;
+      return parsed;
+    });
+    // Keep the queue alive on failure (rejections are observed by the
+    // returned promise, not by future enqueues).
+    this._writeQueue = next.catch(() => undefined);
+    return next;
   }
 
   async readAll(): Promise<AuditEvent[]> {

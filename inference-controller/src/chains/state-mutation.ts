@@ -9,8 +9,16 @@
 import { z } from "zod";
 import type { AuditLogger } from "../audit/logger.js";
 import type { EventLogger } from "../audit/events.js";
-import type { DomainEvent, ValidationResult } from "../domain/types.js";
+import type {
+  DomainEvent,
+  ValidationFailure,
+  ValidationResult,
+} from "../domain/types.js";
 import { newEventId } from "../domain/ids.js";
+
+export type ScopeCheckResult =
+  | { allowed: true }
+  | { allowed: false; reason: string };
 
 export type StateMutationRequest<I, O> = {
   actor: string;
@@ -18,9 +26,15 @@ export type StateMutationRequest<I, O> = {
   operation: Parameters<AuditLogger["record"]>[0]["operation"];
   inputSchema: z.ZodType<I>;
   input: unknown;
+  // ScopePolicy stage. Per the spec contract, every state mutation must
+  // pass an explicit scope check between input validation and audit.
+  // Callers MUST provide one — there is no implicit allow.
+  scopeCheck: (input: I) => ScopeCheckResult;
   // Service that performs the actual mutation. It is invoked AFTER audit.
-  service: (input: I) => O | Promise<O>;
-  outputSchema: z.ZodType<O>;
+  // The service return type is `unknown` so the outputSchema can coerce /
+  // strip / apply defaults to produce the validated O.
+  service: (input: I) => unknown | Promise<unknown>;
+  outputSchema: z.ZodType<O, z.ZodTypeDef, unknown>;
   // Optional event emitted on success.
   eventKind?: DomainEvent["kind"];
   eventPayload?: (output: O) => Record<string, unknown>;
@@ -32,9 +46,9 @@ export type StateMutationOutcome<O> =
   | { ok: true; output: O; validation: ValidationResult }
   | {
       ok: false;
-      stage: "input" | "audit" | "service" | "output_validation";
+      stage: "input" | "scope" | "audit" | "service" | "output_validation";
       failClosed: boolean;
-      validation: ValidationResult;
+      validation: ValidationFailure;
     };
 
 export async function runStateMutation<I, O>(
@@ -56,7 +70,23 @@ export async function runStateMutation<I, O>(
     };
   }
 
-  // 2. Audit BEFORE service. Fail closed on audit error.
+  // 2. Scope check. Per spec contract: InputValidator -> ScopePolicy ->
+  // AuditLogger -> ... Mutations cannot bypass policy.
+  const scopeResult = req.scopeCheck(parsed.data);
+  if (!scopeResult.allowed) {
+    return {
+      ok: false,
+      stage: "scope",
+      failClosed: false,
+      validation: {
+        ok: false,
+        errorCode: "scope_denied",
+        message: scopeResult.reason,
+      },
+    };
+  }
+
+  // 3. Audit BEFORE service. Fail closed on audit error.
   try {
     await deps.auditLogger.record({
       actor: req.actor,
@@ -82,8 +112,8 @@ export async function runStateMutation<I, O>(
     };
   }
 
-  // 3. Domain service.
-  let output: O;
+  // 4. Domain service.
+  let output: unknown;
   try {
     output = await req.service(parsed.data);
   } catch (err) {
@@ -99,13 +129,18 @@ export async function runStateMutation<I, O>(
     };
   }
 
-  // 4. Output validation.
+  // 5. Output validation.
+  // If this fails, the domain service has ALREADY mutated state, but we
+  // cannot describe the result. Per spec point 4 ("transactional where
+  // possible") we have no rollback, so the system is potentially
+  // inconsistent — fail closed so callers treat this as a critical
+  // incident, not a routine error.
   const outParsed = req.outputSchema.safeParse(output);
   if (!outParsed.success) {
     return {
       ok: false,
       stage: "output_validation",
-      failClosed: false,
+      failClosed: true,
       validation: {
         ok: false,
         errorCode: "result_invalid",
@@ -113,17 +148,18 @@ export async function runStateMutation<I, O>(
       },
     };
   }
+  const validatedOutput = outParsed.data;
 
-  // 5. Event log (low-cost).
+  // 6. Event log (low-cost).
   if (req.eventKind) {
     deps.eventLogger.emit({
       id: newEventId(),
       investigationId: req.investigationId,
       kind: req.eventKind,
-      payload: req.eventPayload ? req.eventPayload(output) : {},
+      payload: req.eventPayload ? req.eventPayload(validatedOutput) : {},
       timestamp: new Date().toISOString(),
     });
   }
 
-  return { ok: true, output, validation: { ok: true } };
+  return { ok: true, output: validatedOutput, validation: { ok: true } };
 }

@@ -48,7 +48,19 @@ export class ToolGateway {
         latencyMs: 0,
       };
     }
-    return handler(invocation);
+    const start = Date.now();
+    try {
+      return await handler(invocation);
+    } catch (err) {
+      // Normalize handler exceptions into a failure envelope so the chain
+      // can keep deterministic stage handling.
+      return {
+        ok: false,
+        toolId: invocation.toolId,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        latencyMs: Date.now() - start,
+      };
+    }
   }
 
   has(toolId: string): boolean {

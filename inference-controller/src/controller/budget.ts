@@ -25,6 +25,13 @@ export function ensureBudgetAvailable(b: Budgets): void {
   if (b.memoryPressure >= 1) throw new BudgetExhaustedError("memoryPressure");
 }
 
+export class NegativeDebitError extends Error {
+  constructor(public readonly axis: string, public readonly value: number) {
+    super(`debit value for ${axis} must be non-negative, got ${value}`);
+    this.name = "NegativeDebitError";
+  }
+}
+
 export function debit(
   b: Budgets,
   patch: Partial<Pick<
@@ -38,6 +45,12 @@ export function debit(
     | "riskRemaining"
   >>
 ): Budgets {
+  // Reject negative deltas so callers cannot accidentally grow a budget.
+  for (const [axis, value] of Object.entries(patch)) {
+    if (value !== undefined && value < 0) {
+      throw new NegativeDebitError(axis, value);
+    }
+  }
   return {
     ...b,
     costRemaining: Math.max(0, b.costRemaining - (patch.costRemaining ?? 0)),

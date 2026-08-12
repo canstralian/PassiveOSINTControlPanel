@@ -45,6 +45,7 @@ export {
   ensureBudgetAvailable,
   debit,
   BudgetExhaustedError,
+  NegativeDebitError,
 } from "./controller/budget.js";
 export { evaluateStop, makeStopCandidate } from "./controller/stop.js";
 export type { StopReason, StopSignal, StopInputs } from "./controller/stop.js";
@@ -59,6 +60,7 @@ export type {
 } from "./chains/external-action.js";
 export { runStateMutation } from "./chains/state-mutation.js";
 export type {
+  ScopeCheckResult,
   StateMutationOutcome,
   StateMutationRequest,
 } from "./chains/state-mutation.js";
