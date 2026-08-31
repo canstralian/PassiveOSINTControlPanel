@@ -39,4 +39,4 @@ markdown-it-py>=4.2.0,<5
 
 # AI
 
-anthropic>=0.100.0,<1.0.0
+anthropic>=1.2.0,<2.0.0
